@@ -77,7 +77,7 @@ class FilmCore:
                     {"variable1":"summer", "variable2":"hot"}
                 )
 
-        Reference for the returnd results from OpenAI ChatCompletion
+        Reference for the returnd results from OpenAI ChatCompletion, which will be stored in self.result
         {
             "choices": [
                 {
