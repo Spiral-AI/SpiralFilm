@@ -1,24 +1,25 @@
-# SpiralFilm
-## Introduction
-SpiralFilm is a thin wrapper for the OpenAI GPT family of APIs. It packages the necessary features for users with a certain level of understanding of language models to create various applications as quickly as possible. 
+# Welcome to SpiralFilm! 🎬🎉
+## Buckle up, here's what we're all about!
+SpiralFilm is your super-duper, easy-peasy wrapper for the OpenAI GPT family of APIs! It's got all the bells and whistles to help users with a dab of language model know-how to whip up a vast variety of applications in a jiffy!
 
-The main design philosophies are:
+Here are the core philosophies we stand by:
 
-- Unlike LlamaIndex, it does not encompass integration with VectorDB and the likes. We expect developers to have a certain level of development capability to call various databases.
-- It does not provide a high level of abstraction like LangChain. Developers are able to easily modify prompts without delving deep into the code.
-- It does not perform overly complex processing of prompts like guidance. With conversational APIs like gpt-3.5-turbo or gpt-4 in mind, it keeps processing to the bare minimum.
+- We don't try to fit all things into one, unlike LlamaIndex. No built-in integration with VectorDB or similar stuff here! We trust that our developers have the chops to call up whatever databases they need.
+- Unlike LangChain, we're not into excessive abstraction. We love our developers to tweak prompts with ease, without going down the rabbit hole of code.
+- No over-the-top processing of prompts like guidance, either. With conversational wizards like gpt-3.5-turbo or gpt-4 in mind, we stick to the basics and keep things lean and mean!
 
-As a result, the provided features include:
+So what do you get in this awesome package?
 
-- Automatic retry
-- Placeholder functionality
-- Token count verification
-- Confirmation of sent prompts, time measurement features, and logging
-- Generation of appropriate exceptions
+- Auto-retry: For those "Oops!" moments.
+- Placeholder functionality: Just like Mad Libs!
+- Token count verification: No more hide and seek with tokens.
+- Prompt confirmation, time measurement, and logging: For those "I wonder what happened" moments.
+- Generating exceptions: Because sometimes, things go wrong, and that's okay!
 
-Additionally, we propose templates for prompt modules that are easy to version control as an advanced feature.
+Plus, as a cherry on top, we also pitch in some easy-to-manage version control templates for prompt modules. Talk about going the extra mile!
 
-## Installation
+## Getting SpiralFilm on your machine
 XXX
 
-## TBD
+## More awesome stuff coming your way
+Stay tuned... 😉
