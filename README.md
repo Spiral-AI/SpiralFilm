@@ -7,6 +7,7 @@ The main design philosophies are:
 - Unlike LlamaIndex, it does not encompass integration with VectorDB and the likes. We expect developers to have a certain level of development capability to call various databases.
 - It does not provide a high level of abstraction like LangChain. Developers are able to easily modify prompts without delving deep into the code.
 - It does not perform overly complex processing of prompts like guidance. With conversational APIs like gpt-3.5-turbo or gpt-4 in mind, it keeps processing to the bare minimum.
+
 As a result, the provided features include:
 
 - Automatic retry
