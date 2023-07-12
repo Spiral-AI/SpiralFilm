@@ -22,10 +22,10 @@ For the everyday users who simply can't wait to dive into the SpiralFilm action,
 
 ```
 # For the pip wizards 🧙‍♀️
-pip install git@github.com:Spiral-AI/SpiralFilm.git
+pip install git+https@github.com:Spiral-AI/SpiralFilm.git@main
 
 # For the poetry aficionados 🖋️
-poetry add git@github.com:Spiral-AI/SpiralFilm.git
+poetry add git+https://github.com/Spiral-AI/SpiralFilm.git@main
 ```
 
 For our dear developers, once you've cloned from git, jump into the folder and give this command a spin. Now you can see your modifications to SpiralFilm take effect in real-time in your other code! 
@@ -63,7 +63,7 @@ print(f)
 ```
 
 ### Example 2: The Configured Convo 🤖
-Next up, we'll use a configuration to fine-tune our instance. You can find this script in `config_example.py`
+Next up, we'll use a configuration to fine-tune our instance. You can find this script in `examples/config_example.py`
 
 ```python
 from spiral_film import FilmCore, FilmConfig
