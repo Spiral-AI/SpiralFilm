@@ -8,7 +8,7 @@ setup(
     author_email="y_sasaki@go-spiral.ai",
     description="A thin wrapper for the OpenAI GPT family of APIs",
     packages=find_packages(),
-    install_requires=[],
+    install_requires=["openai", "tiktoken"],
     classifiers=[
         "Development Status :: 3 - Alpha",
         "Intended Audience :: Developers",
