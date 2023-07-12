@@ -18,6 +18,7 @@ import time
 import logging
 import openai
 import tiktoken
+import re
 from .config import FilmConfig
 
 
@@ -53,11 +54,12 @@ class FilmCore:
         self.history = history
         self.prompt = prompt  # user prompt
         if system_prompt is None:
-            self.system_prompt = config.system_prompt
+            self.system_prompt = "You're a helpful assistant."
         else:
-            self.system_prompt = "You're a helpful assistant."  # system prompt
+            self.system_prompt = system_prompt
         self.config = config
         self.max_retries = max_retries
+        self.wait_time = [1, 3, 5, 10]  # time to wait before retrying
         self.timeout = timeout
 
         self.result = None
@@ -104,7 +106,7 @@ class FilmCore:
         messages = self._messages(prompt, self.history, self.system_prompt)
 
         start_time = time.time()
-        self.result = self._automatic_retry(messages, config=self.config)
+        self.result = self._call_with_retry(messages, config=self.config)
         end_time = time.time()
 
         # Parse the result
@@ -119,21 +121,7 @@ class FilmCore:
         )
         return self.result_message
 
-    def __call__(self, placeholders={}):
-        """Run the API with the given placeholders and config.
-        Args:
-            placeholders (dict): A dictionary of placeholders and their values.
-            config (FilmConfig): A FilmConfig object. If None, the config passed to the constructor is used.
-        Returns:
-            The result of the API call.
-
-        Usage:
-            fc = FilmCore(prompt, config=myconfig)
-            result = fc({"variable1":"summer", "variable2":"hot"})
-        """
-        return self.run(placeholders)
-
-    def _automatic_retry(self, messages, config):
+    def _call_with_retry(self, messages, config):
         """
         Error handling and automatic retry.
         See details:
@@ -146,18 +134,25 @@ class FilmCore:
         Returns:
             The result of the API call.
         """
-        for i in range(max_retries):
+        for i in range(self.max_retries):
             try:
                 return openai.ChatCompletion.create(
                     messages=messages, timeout=self.timeout, **config.to_dict()
                 )
-            except openai.APIConnectionError as err:
+            except (
+                openai.error.RateLimitError,
+                openai.error.Timeout,
+                openai.error.APIError,
+                openai.error.APIConnectionError,
+            ) as err:
+                wait_time = self.wait_time[min(i, len(self.wait_time) - 1)]
                 logging.warning(
-                    f"API connection error: {err}, retrying {i + 1}/{max_retries}"
+                    f"API rate-limit error: {err},"
+                    + f"wait for {wait_time}s and retry ({i + 1}/{self.max_retries})"
                 )
-                time.sleep(1)
-            except openai.InvalidRequestError as err:
-                logging.error(f"Invalid request: {err}, no more retries.")
+                time.sleep(wait_time)
+            except Exception as err:
+                logging.error(f"Error: {err}")
                 raise
         raise Exception("Max retries exceeded.")
 
@@ -177,6 +172,16 @@ class FilmCore:
                 raise ValueError(f"Placeholder '{{{key}}}' not found in the prompt.")
             prompt = prompt.replace(f"{{{key}}}", value)
         return prompt
+
+    def placeholders(self):
+        """
+        Return a list of placeholders in the prompt.
+        Placeholders are enclosed in double curly brackets, e.g. {{placeholder}}.
+
+        Return:
+            A list of placeholders in the prompt.
+        """
+        return re.findall(r"\{\{(.+?)\}\}", self.prompt)
 
     def _messages(self, prompt, history, system_prompt):
         """
@@ -267,7 +272,7 @@ class FilmCore:
         """
 
         if self.result_message is None:
-            raise ValueError("Please call run() first.")
+            raise Exception("Please call run() first.")
 
         history = self.history[:]
         history.append(self.prompt)

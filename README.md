@@ -1,25 +1,95 @@
-# Welcome to SpiralFilm! 🎬🎉
-## Buckle up, here's what we're all about!
-SpiralFilm is your super-duper, easy-peasy wrapper for the OpenAI GPT family of APIs! It's got all the bells and whistles to help users with a dab of language model know-how to whip up a vast variety of applications in a jiffy!
+# SpiralFilm 🌀🎥
+## Introduction 🚀
+SpiralFilm is your friendly neighborhood wrapper for the OpenAI ChatGPT family of APIs. It's designed for those knowledge-hungry language model enthusiasts who can't wait to whip up various applications at lightning speed. 🌩️
 
-Here are the core philosophies we stand by:
+Here's how we roll:
 
-- We don't try to fit all things into one, unlike LlamaIndex. No built-in integration with VectorDB or similar stuff here! We trust that our developers have the chops to call up whatever databases they need.
-- Unlike LangChain, we're not into excessive abstraction. We love our developers to tweak prompts with ease, without going down the rabbit hole of code.
-- No over-the-top processing of prompts like guidance, either. With conversational wizards like gpt-3.5-turbo or gpt-4 in mind, we stick to the basics and keep things lean and mean!
+- Unlike LlamaIndex 🦙, we're not into the whole integration-with-VectorDB-and-the-likes thing. We believe in you, developers, and trust in your abilities to call upon various databases as you please. 💪
+- Forget about high-level abstraction like you'd see in LangChain 🔗. With us, you can tweak prompts without needing to dig into the dark depths of the code. 😎
+- We're not into overcomplicating stuff. So, unlike guidance, we won't boggle you down with complex processing of prompts. We're more of a keep-it-simple-stupid kind of wrapper, especially when it comes to APIs like gpt-3.5-turbo 🚀 or gpt-4. 🤖
 
-So what do you get in this awesome package?
+What we do bring to the table includes:
 
-- Auto-retry: For those "Oops!" moments.
-- Placeholder functionality: Just like Mad Libs!
-- Token count verification: No more hide and seek with tokens.
-- Prompt confirmation, time measurement, and logging: For those "I wonder what happened" moments.
-- Generating exceptions: Because sometimes, things go wrong, and that's okay!
+- Automatic retry (because sometimes, at first, you don't succeed) ↩️
+- Placeholder functionality (like mad-libs, but for code) 🖍️
+- Token count verification (keeping count, so you don't have to) 🔢
+- Keeping you in the loop with confirmations of sent prompts, timing features, and logging 🕒
+- And more! 🎉
 
-Plus, as a cherry on top, we also pitch in some easy-to-manage version control templates for prompt modules. Talk about going the extra mile!
+## Installation 🔧
 
-## Getting SpiralFilm on your machine
-XXX
+For the everyday users who simply can't wait to dive into the SpiralFilm action, here's how you can get the latest version all shiny and ready:
 
-## More awesome stuff coming your way
-Stay tuned... 😉
+```
+# For the pip wizards 🧙‍♀️
+pip install git@github.com:Spiral-AI/SpiralFilm.git
+
+# For the poetry aficionados 🖋️
+poetry add git@github.com:Spiral-AI/SpiralFilm.git
+```
+
+For our dear developers, once you've cloned from git, jump into the folder and give this command a spin. Now you can see your modifications to SpiralFilm take effect in real-time in your other code! 
+
+```
+pip install -e .
+```
+Magic! 🎩✨
+
+## Tutorial 📚
+
+Now that you've got SpiralFilm installed, let's see it in action! Here are a couple of simple examples to get you started:
+
+### Example 1: The Simple Scenario 🏄‍♀️
+For this, we'll use the script in `./examples/simple_example.py`
+
+```python
+from spiral_film import FilmCore
+
+# First things first, let's set up the environment variable for your OpenAI API key
+# Uncomment and insert your key as shown below
+# import os
+# os.environ["OPENAI_API_KEY"] = "your key here"
+
+# Now, let's create a filmcore instance
+f = FilmCore(
+    prompt="""
+Talk as you want.
+You're {{user_name}}.
+"""
+).run(placeholders={"user_name": "Tom"})  # Let's pretend we're Tom for this one
+
+# Print it out and see what Tom has to say!
+print(f)
+```
+
+### Example 2: The Configured Convo 🤖
+Next up, we'll use a configuration to fine-tune our instance. You can find this script in `config_example.py`
+
+```python
+from spiral_film import FilmCore, FilmConfig
+
+# Don't forget to set your OpenAI API key as an environment variable!
+# Uncomment and set your key
+# import os
+# os.environ["OPENAI_API_KEY"] = "your key here"
+
+# Let's set up our config
+config = FilmConfig(model="gpt-4", temperature=0.5, max_tokens=100)
+
+# And our conversation template
+_template = """
+Talk as you want.
+You're {{user_name}}.
+"""
+
+# Now we'll create a filmcore instance with our config and template
+f = FilmCore(
+    prompt=_template,
+    config=config,
+).run(placeholders={"user_name": "Tom"})  # Tom is back for another round!
+
+# Let's see what Tom has to say under this new configuration
+print(f)
+```
+
+And that's it, folks! You're now ready to start making your own epic conversational masterpieces with SpiralFilm! 🎬🍿 Happy coding! 💻🚀
