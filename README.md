@@ -14,6 +14,7 @@ What we do bring to the table includes:
 - Placeholder functionality (like mad-libs, but for code) 🖍️
 - Token count verification (keeping count, so you don't have to) 🔢
 - Keeping you in the loop with confirmations of sent prompts, timing features, and logging 🕒
+- Caching functionality (to speed up repeated requests and reduce server load) 🚀
 - And more! 🎉
 
 ## Installation 🔧

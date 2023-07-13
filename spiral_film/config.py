@@ -1,4 +1,4 @@
-# configは、繰り返す使える設定変数を指定します。
+# configは、繰り返し使える設定変数を指定します。
 class FilmConfig:
     def __init__(
         self,
@@ -11,6 +11,9 @@ class FilmConfig:
         max_tokens=None,
         presence_penalty=0.0,
         frequency_penalty=0.0,
+        max_retries=100,
+        timeout=10,
+        use_cache=False,
     ):
         self.model = model
         self.temperature = temperature
@@ -21,8 +24,23 @@ class FilmConfig:
         self.max_tokens = max_tokens
         self.presence_penalty = presence_penalty
         self.frequency_penalty = frequency_penalty
+        self.max_retries = max_retries
+        self.timeout = timeout
+        self.use_cache = use_cache
+        self.cache_path = ".cache.pickle"
 
     def to_dict(self):
         """Converts the config object to a dictionary representation for API call."""
         config_dict = vars(self).copy()
-        return {key: value for key, value in config_dict.items() if value is not None}
+        keys = [
+            "model",
+            "temperature",
+            "top_p",
+            "n",
+            "stop",
+            "max_tokens",
+            "presence_penalty",
+            "frequency_penalty",
+            "timeout",
+        ]
+        return {key: value for key, value in config_dict.items() if key in keys}

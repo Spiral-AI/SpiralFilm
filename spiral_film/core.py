@@ -19,6 +19,10 @@ import logging
 import openai
 import tiktoken
 import re
+import logging
+import os
+import pickle
+import hashlib
 from .config import FilmConfig
 
 
@@ -29,8 +33,6 @@ class FilmCore:
         history=[],
         system_prompt=None,
         config=FilmConfig(),
-        max_retries=3,
-        timeout=None,
     ):
         """
         Args:
@@ -39,8 +41,6 @@ class FilmCore:
                             It is expected that the user's input and the system's response will alternate.
             system_prompt (str): The system prompt to be sent to the API. If None, default prompt is used.
             config (FilmConfig): A FilmConfig object.
-            max_retries (int): The maximum number of retries.
-            timeout (int): The timeout in seconds.
 
         """
         assert (
@@ -58,14 +58,29 @@ class FilmCore:
         else:
             self.system_prompt = system_prompt
         self.config = config
-        self.max_retries = max_retries
         self.wait_time = [1, 3, 5, 10]  # time to wait before retrying
-        self.timeout = timeout
 
         self.result = None
         self.result_message = None
         self.finished_reason = None
         self.token_usages = None
+        self.is_cache_hit = None
+
+        if self.config.use_cache:
+            start_time = time.time()
+            if os.path.exists(self.config.cache_path):
+                with open(self.config.cache_path, "rb") as f:
+                    self.cache = pickle.load(f)
+            else:
+                self.cache = {}
+
+            end_time = time.time()
+
+            if end_time - start_time > 1.0:
+                logger.warning(
+                    f"cache loading time = {end_time - start_time} sec is too long."
+                    + f"Consider deleting cache file ({self.config.cache_path})"
+                )
 
     def run(self, placeholders={}):
         """Run the API with the given placeholders and config.
@@ -106,7 +121,26 @@ class FilmCore:
         messages = self._messages(prompt, self.history, self.system_prompt)
 
         start_time = time.time()
-        self.result = self._call_with_retry(messages, config=self.config)
+
+        # check Cache
+        self.is_cache_hit = False
+        if self.config.use_cache:
+            message_hash = hashlib.md5(str(messages).encode()).hexdigest()
+            if message_hash in self.cache:
+                logging.info("Cache hit.")
+                self.result = self.cache[message_hash]
+                self.is_cache_hit = True
+
+        # call API
+        if self.is_cache_hit == False:
+            self.result = self._call_with_retry(messages, config=self.config)
+
+            if self.config.use_cache:
+                # message_hash = hashlib.md5(str(messages).encode()).hexdigest() # Already calcuated
+                self.cache[message_hash] = self.result
+                with open(self.config.cache_path, "wb") as f:
+                    pickle.dump(self.cache, f)
+
         end_time = time.time()
 
         # Parse the result
@@ -134,10 +168,11 @@ class FilmCore:
         Returns:
             The result of the API call.
         """
-        for i in range(self.max_retries):
+
+        for i in range(self.config.max_retries):
             try:
                 return openai.ChatCompletion.create(
-                    messages=messages, timeout=self.timeout, **config.to_dict()
+                    messages=messages, **config.to_dict()
                 )
             except (
                 openai.error.RateLimitError,
@@ -147,8 +182,8 @@ class FilmCore:
             ) as err:
                 wait_time = self.wait_time[min(i, len(self.wait_time) - 1)]
                 logging.warning(
-                    f"API rate-limit error: {err},"
-                    + f"wait for {wait_time}s and retry ({i + 1}/{self.max_retries})"
+                    f"API error: {err},"
+                    + f"wait for {wait_time}s and retry ({i + 1}/{self.config.max_retries})"
                 )
                 time.sleep(wait_time)
             except Exception as err:
