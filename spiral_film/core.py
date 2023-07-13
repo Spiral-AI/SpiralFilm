@@ -125,7 +125,9 @@ class FilmCore:
         # check Cache
         self.is_cache_hit = False
         if self.config.use_cache:
-            message_hash = hashlib.md5(str(messages).encode()).hexdigest()
+            message_hash = hashlib.md5(
+                (str(messages) + str(self.config.to_dict(mode="Caching"))).encode()
+            ).hexdigest()
             if message_hash in self.cache:
                 logging.info("Cache hit.")
                 self.result = self.cache[message_hash]
