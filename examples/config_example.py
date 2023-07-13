@@ -4,7 +4,7 @@ from spiral_film import FilmCore, FilmConfig
 # import os
 # os.environ["OPENAI_API_KEY"] = "your key here"
 
-config = FilmConfig(model="gpt-4", temperature=0.5, max_tokens=100, use_cache=False)
+config = FilmConfig(model="gpt-4", temperature=0.5, max_tokens=100, use_cache=True)
 _template = """
 Talk as you want.
 You're {{user_name}}.

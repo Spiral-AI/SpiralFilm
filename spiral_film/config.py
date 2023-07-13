@@ -29,10 +29,13 @@ class FilmConfig:
         self.use_cache = use_cache
         self.cache_path = ".cache.pickle"
 
-    def to_dict(self):
+    def to_dict(self, mode="APICalling"):
         """Converts the config object to a dictionary representation for API call."""
+        assert mode in ["APICalling", "Caching"]
+
         config_dict = vars(self).copy()
-        keys = [
+
+        keys_APICalling = [
             "model",
             "temperature",
             "top_p",
@@ -43,4 +46,22 @@ class FilmConfig:
             "frequency_penalty",
             "timeout",
         ]
+
+        keys_Caching = [
+            "model",
+            "temperature",
+            "top_p",
+            "n",
+            "stop",
+            "max_tokens",
+            "presence_penalty",
+            "frequency_penalty",
+        ]
+
+        keys = []
+        if mode == "APICalling":
+            keys = keys_APICalling
+        elif mode == "Caching":
+            keys = keys_Caching
+
         return {key: value for key, value in config_dict.items() if key in keys}
