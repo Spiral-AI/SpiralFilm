@@ -211,7 +211,7 @@ class FilmCore:
             pattern = f"{{{{{re.escape(key)}}}}}"
 
             if not re.search(pattern, prompt):
-                raise ValueError(f"Placeholder '{{{{key}}}}' not found in the prompt.")
+                raise ValueError(f"Placeholder '{key}' not found in the prompt.")
 
             prompt = re.sub(pattern, value, prompt)
         return prompt
