@@ -20,5 +20,8 @@ variables = {"your_name": "Tom", "my_name": "John"}
 # Show the number of tokens with the given variables
 print("num_tokens =", f.num_tokens(variables), "max_tokens =", f.max_tokens())
 
-# Show the composed prompt
-print("prompt =", f.
+# Generate a text with the given variables
+result = f.run(variables)
+
+# dump the result
+f.summary(save_path="test.txt")
