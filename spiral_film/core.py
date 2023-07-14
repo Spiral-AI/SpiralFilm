@@ -119,6 +119,8 @@ class FilmCore:
         """
         prompt = self._placeholder(self.prompt, placeholders)
         messages = self._messages(prompt, self.history, self.system_prompt)
+        self.result_prompt = prompt
+        self.result_messages = messages
 
         start_time = time.time()
 
@@ -133,12 +135,12 @@ class FilmCore:
                 self.result = self.cache[message_hash]
                 self.is_cache_hit = True
 
-        # call API
+        # call API if cache is not hit
         if self.is_cache_hit == False:
             self.result = self._call_with_retry(messages, config=self.config)
 
             if self.config.use_cache:
-                # message_hash = hashlib.md5(str(messages).encode()).hexdigest() # Already calcuated
+                # message_hash is already calcuated
                 self.cache[message_hash] = self.result
                 with open(self.config.cache_path, "wb") as f:
                     pickle.dump(self.cache, f)
@@ -146,7 +148,7 @@ class FilmCore:
         end_time = time.time()
 
         # Parse the result
-        self.result_message = self.result["choices"][0]["message"]["content"]
+        self.result_content = self.result["choices"][0]["message"]["content"]
         self.finished_reason = self.result["choices"][0]["finish_reason"]
         self.token_usages = self.result["usage"]
 
@@ -205,9 +207,13 @@ class FilmCore:
             The prompt with the placeholders replaced with their values.
         """
         for key, value in placeholders.items():
-            if f"{{{key}}}" not in prompt:
-                raise ValueError(f"Placeholder '{{{key}}}' not found in the prompt.")
-            prompt = prompt.replace(f"{{{key}}}", value)
+            # re.escape is used to escape special characters in 'key'
+            pattern = f"{{{{{re.escape(key)}}}}}"
+
+            if not re.search(pattern, prompt):
+                raise ValueError(f"Placeholder '{{{{key}}}}' not found in the prompt.")
+
+            prompt = re.sub(pattern, value, prompt)
         return prompt
 
     def placeholders(self):
@@ -315,3 +321,32 @@ class FilmCore:
         history.append(self.prompt)
         history.append(self.result_message)
         return history
+
+    def summary(self, save_path=None):
+        """
+        Generate a summary of the conversation.
+
+        Returns:
+            str : A summary of the conversation.
+        """
+
+        return_string = ""
+
+        if self.result_messages:
+            return_string += "\n".join(
+                [f"{x['role']}: {x['content']}" for x in self.result_messages]
+            )
+            return_string += "\n----------\n"
+
+        if self.result_content:
+            return_string += "assistant: " + self.result_content
+
+        if save_path is not None:
+            # if save_path contains a directory, create it if it doesn't exist
+            save_dir = os.path.dirname(save_path)
+            if save_dir != "" and not os.path.exists(save_dir):
+                os.makedirs(save_dir)
+            # create file
+            with open(save_path, "w") as f:
+                f.write(return_string)
+        return return_string
