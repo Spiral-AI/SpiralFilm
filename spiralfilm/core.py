@@ -157,7 +157,7 @@ class FilmCore:
             + f"Result: {self.result}\n\n"
             + f"Time taken: {end_time - start_time} sec."
         )
-        return self.result_message
+        return self.result_content
 
     def _call_with_retry(self, messages, config):
         """
