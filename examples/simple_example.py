@@ -1,4 +1,4 @@
-from spiral_film import FilmCore
+from spiralfilm import FilmCore
 
 # Ensure you have set the OPENAI_API_KEY environment variable
 # import os

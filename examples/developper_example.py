@@ -1,4 +1,4 @@
-from spiral_film import FilmCore, FilmConfig
+from spiralfilm import FilmCore, FilmConfig
 
 # Ensure you have set the OPENAI_API_KEY environment variable
 # import os
@@ -25,3 +25,4 @@ result = f.run(variables)
 
 # dump the result
 f.summary(save_path="test.txt")
+print(result)
