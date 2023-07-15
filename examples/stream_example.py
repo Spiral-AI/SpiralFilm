@@ -1,4 +1,5 @@
 from spiralfilm import FilmCore
+import sys
 
 # Ensure you have set the OPENAI_API_KEY environment variable
 # import os
@@ -13,4 +14,5 @@ You're {{user_name}}.
 
 for chunk in f:
     print(chunk, end="")
+    sys.stdout.flush()
 print()
