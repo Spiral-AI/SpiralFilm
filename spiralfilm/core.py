@@ -159,6 +159,36 @@ class FilmCore:
         )
         return self.result_content
 
+    def stream(self, placeholders={}):
+        """
+        Args:
+            messages (list): A list of messages to be sent to the API.
+            config (FilmConfig): A FilmConfig object.
+        Returns:
+            The result of the API call.
+        """
+        prompt = self._placeholder(self.prompt, placeholders)
+        messages = self._messages(prompt, self.history, self.system_prompt)
+        self.result_prompt = prompt
+        self.result_messages = messages
+
+        stream_object = openai.ChatCompletion.create(
+            messages=messages,
+            **self.config.to_dict(),
+            stream=True,
+        )
+
+        self.result_content = ""
+
+        for result in stream_object:
+            if "content" in result["choices"][0]["delta"]:
+                newtoken = result["choices"][0]["delta"]["content"]
+                self.finished_reason = result["choices"][0]["finish_reason"]
+                self.result_content += newtoken
+                yield newtoken
+            else:
+                return
+
     def _call_with_retry(self, messages, config):
         """
         Error handling and automatic retry.
