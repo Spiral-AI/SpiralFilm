@@ -98,6 +98,6 @@ And that's it, folks! You're now ready to start making your own epic conversatio
 
 But wait, there's more! Be sure to check out the "examples" folder for more usage scenarios and ideas. We've packed it full of tips, tricks, and goodies to get you up and running in no time. 📚🔍
 
-# Contributing 🤝
+## Contribution 🤝
 
 Ff you feel like giving back, we always welcome contributions. But remember, at SpiralFilm, we're all about keeping it simple and transparent. We love that you're excited to add features, but let's keep it in line with our "thin-wrapper" philosophy. That way, everyone can continue to enjoy the beauty of simplicity! 💖🌐
