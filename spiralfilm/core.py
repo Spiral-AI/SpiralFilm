@@ -23,6 +23,8 @@ import logging
 import os
 import pickle
 import hashlib
+import asyncio
+from threading import Lock
 from .config import FilmConfig
 
 
@@ -62,9 +64,11 @@ class FilmCore:
 
         self.result = None
         self.result_message = None
+        self.result_content = ""
         self.finished_reason = None
         self.token_usages = None
         self.is_cache_hit = None
+        self.cache_lock = Lock()  # Create a lock for cache
 
         if self.config.use_cache:
             start_time = time.time()
@@ -127,23 +131,25 @@ class FilmCore:
         # check Cache
         self.is_cache_hit = False
         if self.config.use_cache:
-            message_hash = hashlib.md5(
-                (str(messages) + str(self.config.to_dict(mode="Caching"))).encode()
-            ).hexdigest()
-            if message_hash in self.cache:
-                logging.info("Cache hit.")
-                self.result = self.cache[message_hash]
-                self.is_cache_hit = True
+            with self.cache_lock:  # Acquire lock when accessing cache
+                message_hash = hashlib.md5(
+                    (str(messages) + str(self.config.to_dict(mode="Caching"))).encode()
+                ).hexdigest()
+                if message_hash in self.cache:
+                    logging.info("Cache hit.")
+                    self.result = self.cache[message_hash]
+                    self.is_cache_hit = True
 
         # call API if cache is not hit
         if self.is_cache_hit == False:
             self.result = self._call_with_retry(messages, config=self.config)
 
             if self.config.use_cache:
-                # message_hash is already calcuated
-                self.cache[message_hash] = self.result
-                with open(self.config.cache_path, "wb") as f:
-                    pickle.dump(self.cache, f)
+                with self.cache_lock:  # Acquire lock when updating cache
+                    # message_hash is already calcuated
+                    self.cache[message_hash] = self.result
+                    with open(self.config.cache_path, "wb") as f:
+                        pickle.dump(self.cache, f)
 
         end_time = time.time()
 
@@ -188,6 +194,27 @@ class FilmCore:
                 yield newtoken
             else:
                 return
+
+    async def run_async(self, placeholders={}):
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(None, self.run, placeholders)
+        return result
+
+    async def stream_async(self, placeholders={}):
+        # Create generator
+        generator = self.stream(placeholders)
+
+        while True:
+            try:
+                # Run the `next` function to get the next item from the generator
+                result = await asyncio.to_thread(lambda: next(generator, None))
+                if result is None:
+                    break
+                else:
+                    yield result
+            except Exception as e:
+                print(f"An error occurred: {e}")
+                break
 
     def _call_with_retry(self, messages, config):
         """

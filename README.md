@@ -15,6 +15,7 @@ What we do bring to the table includes:
 - Token count verification (keeping count, so you don't have to) 🔢
 - Keeping you in the loop with confirmations of sent prompts, timing features, and logging 🕒
 - Caching functionality (to speed up repeated requests and reduce server load) 🚀
+- Async execution support, allowing you to run multiple tasks simultaneously, thereby making your application more efficient and responsive. 👾
 - And more! 🎉
 
 ## Installation 🔧
@@ -94,3 +95,9 @@ print(f)
 ```
 
 And that's it, folks! You're now ready to start making your own epic conversational masterpieces with SpiralFilm! 🎬🍿 Happy coding! 💻🚀
+
+But wait, there's more! Be sure to check out the "examples" folder for more usage scenarios and ideas. We've packed it full of tips, tricks, and goodies to get you up and running in no time. 📚🔍
+
+# Contributing 🤝
+
+Ff you feel like giving back, we always welcome contributions. But remember, at SpiralFilm, we're all about keeping it simple and transparent. We love that you're excited to add features, but let's keep it in line with our "thin-wrapper" philosophy. That way, everyone can continue to enjoy the beauty of simplicity! 💖🌐
