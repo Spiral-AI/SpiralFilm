@@ -70,11 +70,6 @@ Next up, we'll use a configuration to fine-tune our instance. You can find this 
 ```python
 from spiral_film import FilmCore, FilmConfig
 
-# Don't forget to set your OpenAI API key as an environment variable!
-# Uncomment and set your key
-# import os
-# os.environ["OPENAI_API_KEY"] = "your key here"
-
 # Let's set up our config
 config = FilmConfig(model="gpt-4", temperature=0.5, max_tokens=100)
 
@@ -94,14 +89,38 @@ f = FilmCore(
 print(f)
 ```
 
-### Example 3: Deep Dive with Embeddings 🌊
+### Example 3: Recollections and Context Memory 🧠
+There's immense power in context, and with `FilmCore`, you can harness this power seamlessly. This example, which you can find in `examples/conversation_example.py`, showcases how you can retain context and query it in subsequent interactions:
+
+
+By using the create_from method, we can ensure a smooth continuation of the conversation. So, whether it's a fact, a story detail, or a crucial piece of data, FilmCore helps keep the narrative threads intact. 🧵📖
+```python
+from spiralfilm import FilmCore
+
+fc1 = FilmCore(
+    prompt="""
+Remember that x={{num}}.
+Hello!
+"""
+)
+print(fc1.run(placeholders={"num": "1234"}))
+
+fc2 = FilmCore.create_from(
+    fc1,
+    prompt="""
+Do you remember x?
+                         """,
+)
+
+print(fc2.run())
+
+```
+
+
+### Example 4: Deep Dive with Embeddings 🌊
 If you're keen on exploring semantic relationships between sentences, the `FilmEmbed` utility is your new best friend. Dive into the embedding space and uncover hidden dimensions of meaning. Let's see it in action in the `examples/embed_example.py` script:
 ```python
 from spiralfilm import FilmEmbed
-
-# Ensure you have set the OPENAI_API_KEY environment variable
-# import os
-# os.environ["OPENAI_API_KEY"] = "your key here"
 
 examples = []
 
