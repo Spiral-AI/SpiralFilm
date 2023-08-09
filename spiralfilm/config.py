@@ -65,3 +65,29 @@ class FilmConfig:
             keys = keys_Caching
 
         return {key: value for key, value in config_dict.items() if key in keys}
+
+
+class FilmEmbedConfig(FilmConfig):
+    def __init__(
+        self,
+        model="text-embedding-ada-002",
+        use_cache=False,
+    ):
+        super().__init__(
+            model=model,
+            use_cache=use_cache,
+        )
+
+    def to_dict(self, mode="APICalling"):
+        """Converts the config object to a dictionary representation for API call."""
+        assert mode in ["APICalling", "Caching"]
+
+        config_dict = vars(self).copy()
+
+        keys = []
+        if mode == "APICalling":
+            keys = ["model"]
+        elif mode == "Caching":
+            keys = ["model"]
+
+        return {key: value for key, value in config_dict.items() if key in keys}

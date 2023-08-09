@@ -42,7 +42,7 @@ Magic! 🎩✨
 Now that you've got SpiralFilm installed, let's see it in action! Here are a couple of simple examples to get you started:
 
 ### Example 1: The Simple Scenario 🏄‍♀️
-For this, we'll use the script in `./examples/simple_example.py`
+For this, we'll use the script in `examples/simple_example.py`
 
 ```python
 from spiral_film import FilmCore
@@ -93,6 +93,41 @@ f = FilmCore(
 # Let's see what Tom has to say under this new configuration
 print(f)
 ```
+
+### Example 3: Deep Dive with Embeddings 🌊
+If you're keen on exploring semantic relationships between sentences, the `FilmEmbed` utility is your new best friend. Dive into the embedding space and uncover hidden dimensions of meaning. Let's see it in action in the `examples/embed_example.py` script:
+```python
+from spiralfilm import FilmEmbed
+
+# Ensure you have set the OPENAI_API_KEY environment variable
+# import os
+# os.environ["OPENAI_API_KEY"] = "your key here"
+
+examples = []
+
+examples.append("Today is a super good day.")
+examples.append("Today is a good day.")
+examples.append("Today is a bad day.")
+
+vecs = FilmEmbed().run(texts=examples)
+
+
+def calc_similarity(v1, v2):
+    return sum([v1[i] * v2[i] for i in range(len(v1))])
+
+
+print(
+    f"Similarity between '{examples[0]}' and '{examples[1]}' : ",
+    calc_similarity(vecs[0], vecs[1]),
+)
+print(
+    f"Similarity between '{examples[0]}' and '{examples[2]}' : ",
+    calc_similarity(vecs[0], vecs[2]),
+)
+
+```
+
+With this, you're equipped to explore semantic spaces and better understand the relationship between different sentences. What story do your embeddings tell? 🧐📊
 
 And that's it, folks! You're now ready to start making your own epic conversational masterpieces with SpiralFilm! 🎬🍿 Happy coding! 💻🚀
 
