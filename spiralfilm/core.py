@@ -63,11 +63,10 @@ class FilmCore:
         self.wait_time = [1, 3, 5, 10]  # time to wait before retrying
 
         self.result = None
-        self.result_message = None
+        self.result_messages = None
         self.result_content = ""
         self.finished_reason = None
         self.token_usages = None
-        self.is_cache_hit = None
         self.cache_lock = Lock()  # Create a lock for cache
 
         if self.config.use_cache:
@@ -85,6 +84,36 @@ class FilmCore:
                     f"cache loading time = {end_time - start_time} sec is too long."
                     + f"Consider deleting cache file ({self.config.cache_path})"
                 )
+
+    @staticmethod
+    def create_from(
+        existing_instance,
+        prompt,
+        system_prompt=None,
+        config=None,
+    ):
+        """
+        既存のFilmCoreインスタンスの履歴を使用して、新しいFilmCoreインスタンスを作成します。
+
+        Parameters:
+        - existing_instance: 既存のFilmCoreインスタンス
+        - new_prompt: 新しいインスタンスのプロンプト
+
+        Returns:
+        新しいFilmCoreインスタンス
+        """
+
+        # 新しいインスタンスを作成し、履歴を引き継ぎます
+        new_instance = FilmCore(
+            prompt=prompt,
+            history=existing_instance.get_history(),
+            system_prompt=system_prompt
+            if system_prompt is not None
+            else existing_instance.system_prompt,
+            config=existing_instance.config if config is None else config,
+        )
+
+        return new_instance
 
     def run(self, placeholders={}):
         """Run the API with the given placeholders and config.
@@ -129,7 +158,7 @@ class FilmCore:
         start_time = time.time()
 
         # check Cache
-        self.is_cache_hit = False
+        is_cache_hit = False
         if self.config.use_cache:
             with self.cache_lock:  # Acquire lock when accessing cache
                 message_hash = hashlib.md5(
@@ -138,10 +167,10 @@ class FilmCore:
                 if message_hash in self.cache:
                     logging.info("Cache hit.")
                     self.result = self.cache[message_hash]
-                    self.is_cache_hit = True
+                    is_cache_hit = True
 
         # call API if cache is not hit
-        if self.is_cache_hit == False:
+        if is_cache_hit == False:
             self.result = self._call_with_retry(messages, config=self.config)
 
             if self.config.use_cache:
@@ -371,13 +400,10 @@ class FilmCore:
             A list of messages to be sent to the API.
         """
 
-        if self.result_message is None:
+        if self.result_messages is None:
             raise Exception("Please call run() first.")
 
-        history = self.history[:]
-        history.append(self.prompt)
-        history.append(self.result_message)
-        return history
+        return [x["content"] for x in self.result_messages]
 
     def summary(self, save_path=None):
         """
