@@ -4,9 +4,9 @@ import re
 with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
-with open('spiralfilm/__init__.py')) as f:
+with open("spiralfilm/__init__.py") as f:
     init_text = f.read()
-    version = re.search(r'__version__\s*=\s*[\'\"](.+?)[\'\"]', init_text).group(1)
+    version = re.search(r"__version__\s*=\s*[\'\"](.+?)[\'\"]", init_text).group(1)
 
 setup(
     name="SpiralFilm",
