@@ -88,7 +88,7 @@ class FilmEmbed:
                 with self.cache_lock:  # Acquire lock when accessing cache
                     message_hash = hashlib.md5(
                         (
-                            str(messages) + str(self.config.to_dict(mode="Caching"))
+                            str(message) + str(self.config.to_dict(mode="Caching"))
                         ).encode()
                     ).hexdigest()
                     hash_dict[message] = message_hash
@@ -122,7 +122,7 @@ class FilmEmbed:
                     self.cache[message_hash] = api_vec
 
         # update cache
-        if self.config.use_cache:
+        if self.config.use_cache and len(messages_to_call) > 0:
             with self.cache_lock:  # Acquire lock when updating cache
                 with open(self.config.cache_path, "wb") as f:
                     pickle.dump(self.cache, f)

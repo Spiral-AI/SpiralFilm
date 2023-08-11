@@ -1,4 +1,4 @@
-from spiralfilm import FilmEmbed, FilmEmbedConfig
+from spiralfilm import FilmEmbed
 
 # Ensure you have set the OPENAI_API_KEY environment variable
 # import os
