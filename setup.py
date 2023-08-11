@@ -1,11 +1,16 @@
 from setuptools import setup, find_packages
+import re
 
 with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
+with open("spiralfilm/__init__.py") as f:
+    init_text = f.read()
+    version = re.search(r"__version__\s*=\s*[\'\"](.+?)[\'\"]", init_text).group(1)
+
 setup(
     name="SpiralFilm",
-    version="0.1.3",
+    version=version,
     url="https://github.com/Spiral-AI/spiralfilm",
     author="Yuichi Sasaki",
     author_email="y_sasaki@go-spiral.ai",
