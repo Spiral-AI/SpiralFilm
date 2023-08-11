@@ -10,8 +10,7 @@ examples.append("Today is a super good day.")
 examples.append("Today is a good day.")
 examples.append("Today is a bad day.")
 
-config = FilmEmbedConfig(use_cache=True)
-vecs = FilmEmbed(config=config).run(texts=examples)
+vecs = FilmEmbed().run(texts=examples)
 
 
 def calc_similarity(v1, v2):
