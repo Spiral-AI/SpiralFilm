@@ -20,7 +20,12 @@ What we do bring to the table includes:
 
 ## Installation 🔧
 
-For the everyday users who simply can't wait to dive into the SpiralFilm action, here's how you can get the latest version all shiny and ready:
+For the vast majority of users, the easiest way to install SpiralFilm is simply by using pip:
+```
+pip install spiralfilm
+```
+
+However, for those adventurous spirits who want the very latest version, or perhaps the ones who love to walk on the bleeding edge, here's how you can get the freshest cut from our repository:
 
 ```
 # For the pip wizards 🧙‍♀️
@@ -33,6 +38,8 @@ poetry add git+https://github.com/Spiral-AI/SpiralFilm.git@main
 For our dear developers, once you've cloned from git, jump into the folder and give this command a spin. Now you can see your modifications to SpiralFilm take effect in real-time in your other code! 
 
 ```
+git clone git@github.com:Spiral-AI/SpiralFilm.git
+cd SpiralFilm
 pip install -e .
 ```
 Magic! 🎩✨

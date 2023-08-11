@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="SpiralFilm",
-    version="0.1.0",
+    version="0.1.2",
     url="https://github.com/Spiral-AI/spiralfilm",
     author="Yuichi Sasaki",
     author_email="y_sasaki@go-spiral.ai",
