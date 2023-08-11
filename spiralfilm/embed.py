@@ -73,6 +73,11 @@ class FilmEmbed:
         else:
             messages = texts  # rename
 
+        # empty check ... this causes error but difficult to tell from the original error message
+        for message in messages:
+            if len(message) == 0:
+                raise ValueError("Empty string is contained, which is not allowed.")
+
         # check if the message is stored in cache
         cached_results = []  # Store None if cache is not hit
         hash_dict = {}
