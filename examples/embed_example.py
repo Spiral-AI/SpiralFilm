@@ -1,4 +1,4 @@
-from spiralfilm import FilmEmbed
+from spiralfilm import FilmEmbed, FilmEmbedConfig
 
 # Ensure you have set the OPENAI_API_KEY environment variable
 # import os
@@ -10,7 +10,8 @@ examples.append("Today is a super good day.")
 examples.append("Today is a good day.")
 examples.append("Today is a bad day.")
 
-vecs = FilmEmbed().run(texts=examples)
+config = FilmEmbedConfig(use_cache=True)
+vecs = FilmEmbed(config=config).run(texts=examples)
 
 
 def calc_similarity(v1, v2):

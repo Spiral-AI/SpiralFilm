@@ -32,7 +32,6 @@ class FilmEmbed:
         self.config = config
         self.wait_time = [1, 3, 5, 10]  # time to wait before retrying
 
-        self.token_usages = None
         self.results = None
         self.cache_lock = Lock()  # Create a lock for cache
 
@@ -99,10 +98,12 @@ class FilmEmbed:
             for message, result in zip(messages, cached_results)
             if result is None
         ]
-        api_results = self._call_with_retry(messages_to_call, config=self.config)
+        if len(messages_to_call) == 0:
+            api_results = {"data": []}
+        else:
+            api_results = self._call_with_retry(messages_to_call, config=self.config)
 
         # Parse the result
-        self.token_usages = api_results["usage"]
         self.results = []
 
         for message, cached_vec in zip(messages, cached_results):
