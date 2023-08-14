@@ -16,6 +16,7 @@ class FilmConfig:
         frequency_penalty=0.0,
         max_retries=100000,
         timeout=10,
+        max_queues=10,
         use_cache=False,
     ):
         self.model = model
@@ -32,6 +33,7 @@ class FilmConfig:
         self.wait_time = 1.0
         self.max_wait_time = 60.0
         self.use_cache = use_cache
+        self.max_queues = max_queues
         self.cache_path = ".cache.pickle"
         self.apikeys = []
 
