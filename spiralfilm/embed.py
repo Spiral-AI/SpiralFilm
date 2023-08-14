@@ -30,7 +30,6 @@ class FilmEmbed:
             config.model == "text-embedding-ada-002"
         ), "Only text-embedding-ada-002 is supported."
         self.config = config
-        self.wait_time = [1, 3, 5, 10]  # time to wait before retrying
 
         self.results = None
         self.cache_lock = Lock()  # Create a lock for cache
@@ -159,23 +158,30 @@ class FilmEmbed:
         """
 
         for i in range(self.config.max_retries):
+            apikey, time_to_wait = self.config.get_apikey()
+            default_api_key = openai.api_key
+            openai.api_key = apikey
+            if time_to_wait > 0:
+                logging.info(f"Waiting for {time_to_wait}s...")
+                time.sleep(time_to_wait)
+
             try:
-                return openai.Embedding.create(input=messages, **config.to_dict())
+                result = openai.Embedding.create(input=messages, **config.to_dict())
+                self.config.update_apikey(apikey, status="success")
+                return result
             except (
                 openai.error.RateLimitError,
                 openai.error.Timeout,
                 openai.error.APIError,
                 openai.error.APIConnectionError,
             ) as err:
-                wait_time = self.wait_time[min(i, len(self.wait_time) - 1)]
-                logging.warning(
-                    f"API error: {err},"
-                    + f"wait for {wait_time}s and retry ({i + 1}/{self.config.max_retries})"
-                )
-                time.sleep(wait_time)
+                self.config.update_apikey(apikey, status="failure")
+                logging.warning(f"Retryable Error: {err}")
             except Exception as err:
                 logging.error(f"Error: {err}")
                 raise
+            finally:
+                openai.api_key = default_api_key
         raise Exception("Max retries exceeded.")
 
     def num_tokens(self, texts):
