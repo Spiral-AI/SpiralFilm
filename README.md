@@ -71,30 +71,37 @@ You're {{user_name}}.
 print(f)
 ```
 
-### Example 2: The Configured Convo 🤖
-Next up, we'll use a configuration to fine-tune our instance. You can find this script in `examples/config_example.py`
+### Example 2: Parallel Processing Magic 🪄
+Sometimes you might need to generate content for multiple prompts in parallel. Doing them one by one can be time-consuming, especially when dealing with a large number. This is where the run_parallel method shines, making the most out of the available computational power.
 
+For this, we'll use the script in `examples/parallel_example.py``:
 ```python
-from spiral_film import FilmCore, FilmConfig
+from spiralfilm import FilmCore, FilmConfig
 
-# Let's set up our config
-config = FilmConfig(model="gpt-4", temperature=0.5, max_tokens=100)
+# Configuration setup: Here, we're specifying that up to 10 tasks can be run concurrently.
+config = FilmConfig(max_queues=10)
 
-# And our conversation template
-_template = """
-Talk as you want.
-You're {{user_name}}.
-"""
+# Preparing our placeholders list
+placeholders_list = []
+for i in range(20):  # Creating 20 placeholders
+    placeholders_list.append({"number": str(i)})
 
-# Now we'll create a filmcore instance with our config and template
+# Now, let's create a FilmCore instance with our specified configuration
 f = FilmCore(
-    prompt=_template,
+    prompt="""
+Your lucky number is {{number}}.
+""",
     config=config,
-).run(placeholders={"user_name": "Tom"})  # Tom is back for another round!
+)
 
-# Let's see what Tom has to say under this new configuration
-print(f)
+# Using the run_parallel method, all the prompts will be processed concurrently
+results = f.run_parallel(placeholders_list=placeholders_list)
+
+# Displaying the results
+print(results)
+print(f"Processed {len(results)} prompts in parallel!")
 ```
+In this example, the run_parallel method allows for concurrent processing of multiple prompts, drastically reducing the time it would take if done sequentially. This is especially handy for batch processing or when dealing with real-time requirements.
 
 ### Example 3: Recollections and Context Memory 🧠
 There's immense power in context, and with `FilmCore`, you can harness this power seamlessly. This example, which you can find in `examples/conversation_example.py`, showcases how you can retain context and query it in subsequent interactions:

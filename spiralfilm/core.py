@@ -18,6 +18,7 @@ import time
 import logging
 import openai
 import tiktoken
+import tqdm
 import re
 import logging
 import os
@@ -227,6 +228,30 @@ class FilmCore:
         loop = asyncio.get_event_loop()
         result = await loop.run_in_executor(None, self.run, placeholders)
         return result
+
+    async def _run_with_semaphore(self, placeholders, progress):
+        async with self.semaphore:
+            result = await self.run_async(placeholders)
+            progress.update(1)  # タスクが完了したらプログレスバーを更新
+            return result
+
+    def run_parallel(self, placeholders_list=[]):
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            loop.close()
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+        self.semaphore = asyncio.Semaphore(self.config.max_queues)
+        with tqdm.tqdm(total=len(placeholders_list), desc="Processing") as progress:
+            tasks = [
+                self._run_with_semaphore(placeholders, progress)
+                for placeholders in placeholders_list
+            ]
+            results = loop.run_until_complete(asyncio.gather(*tasks))
+
+        loop.close()
+        return results
 
     async def stream_async(self, placeholders={}):
         # Create generator
