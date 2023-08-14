@@ -74,7 +74,7 @@ print(f)
 ### Example 2: Parallel Processing Magic 🪄
 Sometimes you might need to generate content for multiple prompts in parallel. Doing them one by one can be time-consuming, especially when dealing with a large number. This is where the run_parallel method shines, making the most out of the available computational power.
 
-For this, we'll use the script in `examples/parallel_example.py``:
+For this, we'll use the script in `examples/parallel_example.py`:
 ```python
 from spiralfilm import FilmCore, FilmConfig
 
