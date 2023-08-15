@@ -288,7 +288,7 @@ class FilmCore:
             default_api_key = openai.api_key
             openai.api_key = apikey
             if time_to_wait > 0:
-                logging.info(f"Waiting for {time_to_wait}s...")
+                logging.warning(f"Waiting for {time_to_wait}s...")
                 time.sleep(time_to_wait)
 
             try:
