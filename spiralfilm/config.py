@@ -45,9 +45,15 @@ class FilmConfig:
 
     def get_apikey(self):
         if self.apikeys == []:
-            return os.environ["OPENAI_API_KEY"], 0.0
+            # check if os.environ["OPENAI_API_KEY"] is set.
+            if not "OPENAI_API_KEY" in os.environ:
+                raise ValueError("OPENAI_API_KEY is not set in environment variables.")
+
+            self.add_key(os.environ["OPENAI_API_KEY"])
+            return (
+                self.get_apikey()
+            )  # Doing some trick. This call envokes the else statements from the next lines.
         else:
-            # Find the apikey with the earliest available time
             # Sort the apikeys by available time
             self.apikeys.sort(key=lambda x: x["available_time"])
             # Get the first apikey
@@ -65,6 +71,7 @@ class FilmConfig:
                         item["retry_count"]
                     )
                 elif status == "failure":
+                    item["last_called"] = time.mktime(time.gmtime())
                     item["retry_count"] += 1
                     item["available_time"] = item["last_called"] + self._wait_time(
                         item["retry_count"]
@@ -72,9 +79,6 @@ class FilmConfig:
                 else:
                     raise ValueError("status must be either 'success' or 'failure'")
                 break
-        else:
-            # may be default api key
-            pass
 
     def add_key(self, apikey):
         item = {}
