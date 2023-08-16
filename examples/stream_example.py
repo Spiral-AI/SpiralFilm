@@ -10,9 +10,12 @@ f = FilmCore(
 Talk as you want.
 You're {{user_name}}.
 """
-).stream(placeholders={"user_name": "Tom"})
+)
 
-for chunk in f:
+
+for chunk in f.stream(placeholders={"user_name": "Tom"}):
     print(chunk, end="")
     sys.stdout.flush()
 print()
+
+f.summary(save_path="stream_summary.log")
