@@ -75,7 +75,13 @@ class FilmEmbed:
         # empty check ... this causes error but difficult to tell from the original error message
         for message in messages:
             if len(message) == 0:
-                raise ValueError("Empty string is contained, which is not allowed.")
+                raise ValueError("Empty string is not allowed.")
+
+        # azure version accepts up to 16 messages
+        # https://learn.microsoft.com/ja-jp/azure/ai-services/openai/reference#embeddings
+        if self.config.api_type == "azure":
+            if len(messages) > 16:
+                raise ValueError("Azure API only accepts up to 16 messages.")
 
         # check if the message is stored in cache
         cached_results = []  # Store None if cache is not hit
