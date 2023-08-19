@@ -269,6 +269,16 @@ class FilmCore:
                 print(f"An error occurred: {e}")
                 break
 
+    def _set_api(self, apikey):
+        if self.config.api_type == "openai":
+            openai.api_key = apikey["api_key"]
+        elif self.config.api_type == "azure":
+            openai.api_type = "azure"
+            openai.api_key = apikey["api_key"]
+            openai.api_base = apikey["api_base"]
+            openai.api_version = self.config.azure_api_version
+        return
+
     def _call_with_retry(self, messages, config):
         """
         Error handling and automatic retry.
@@ -285,15 +295,16 @@ class FilmCore:
 
         for i in range(self.config.max_retries):
             apikey, time_to_wait = self.config.get_apikey()
-            default_api_key = openai.api_key
-            openai.api_key = apikey
+            self._set_api(apikey)
+
             if time_to_wait > 0:
                 logging.warning(f"Waiting for {time_to_wait}s...")
                 time.sleep(time_to_wait)
 
             try:
                 result = openai.ChatCompletion.create(
-                    messages=messages, **config.to_dict()
+                    messages=messages,
+                    **config.to_dict(),
                 )
                 self.config.update_apikey(apikey, status="success")
                 return result
@@ -308,8 +319,6 @@ class FilmCore:
             except Exception as err:
                 logging.error(f"Error: {err}")
                 raise
-            finally:
-                openai.api_key = default_api_key
         raise Exception("Max retries exceeded.")
 
     def _placeholder(self, prompt, placeholders):

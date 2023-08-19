@@ -144,6 +144,16 @@ class FilmEmbed:
         result = await loop.run_in_executor(None, self.run, texts)
         return result
 
+    def _set_api(self, apikey):
+        if self.config.api_type == "openai":
+            openai.api_key = apikey["api_key"]
+        elif self.config.api_type == "azure":
+            openai.api_type = "azure"
+            openai.api_key = apikey["api_key"]
+            openai.api_base = apikey["api_base"]
+            openai.api_version = self.config.azure_api_version
+        return
+
     def _call_with_retry(self, messages, config):
         """
         Error handling and automatic retry.
@@ -159,8 +169,8 @@ class FilmEmbed:
 
         for i in range(self.config.max_retries):
             apikey, time_to_wait = self.config.get_apikey()
-            default_api_key = openai.api_key
-            openai.api_key = apikey
+            self._set_api(apikey)
+
             if time_to_wait > 0:
                 logging.info(f"Waiting for {time_to_wait}s...")
                 time.sleep(time_to_wait)
@@ -180,8 +190,6 @@ class FilmEmbed:
             except Exception as err:
                 logging.error(f"Error: {err}")
                 raise
-            finally:
-                openai.api_key = default_api_key
         raise Exception("Max retries exceeded.")
 
     def num_tokens(self, texts):
