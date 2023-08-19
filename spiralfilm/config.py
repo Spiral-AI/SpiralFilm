@@ -6,6 +6,9 @@ class FilmConfig:
     def __init__(
         self,
         model="gpt-3.5-turbo",
+        api_type="openai",
+        azure_deployment_id=None,
+        azure_api_version=None,
         temperature=0.0,
         top_p=1.0,
         n=1,
@@ -19,7 +22,21 @@ class FilmConfig:
         max_queues=10,
         use_cache=False,
     ):
+        assert api_type in ["openai", "azure"]
+        if api_type == "azure":
+            assert (
+                azure_deployment_id is not None
+            ), "azure_deployment_id must be specified when api_type is azure. This is an ID provided in Azure portal."
+            assert (
+                azure_api_version is not None
+            ), "azure_api_version must be specified when api_type is azure. Select from https://learn.microsoft.com/ja-jp/azure/ai-services/openai/reference"
+
+        # https://learn.microsoft.com/ja-jp/azure/ai-services/openai/how-to/switching-endpoints
+
         self.model = model
+        self.api_type = api_type
+        self.azure_deployment_id = azure_deployment_id
+        self.azure_api_version = azure_api_version
         self.temperature = temperature
         self.top_p = top_p
         self.n = n
@@ -36,6 +53,7 @@ class FilmConfig:
         self.max_queues = max_queues
         self.cache_path = ".cache.pickle"
         self.apikeys = []
+        self.selected_apikey = None  # required to track if this is openai or azure
 
     def _wait_time(self, retry_count):
         if retry_count == 0:
@@ -59,11 +77,13 @@ class FilmConfig:
             # Get the first apikey
             apikey = self.apikeys[0]
             time_to_wait = apikey["available_time"] - time.mktime(time.gmtime())
-            return apikey["apikey"], time_to_wait
+
+            self.selected_apikey = apikey
+            return apikey, time_to_wait
 
     def update_apikey(self, apikey, status):
         for item in self.apikeys:
-            if item["apikey"] == apikey:
+            if item["api_key"] == apikey["api_key"]:
                 if status == "success":
                     item["last_called"] = time.mktime(time.gmtime())
                     item["retry_count"] = 0
@@ -80,10 +100,18 @@ class FilmConfig:
                     raise ValueError("status must be either 'success' or 'failure'")
                 break
 
-    def add_key(self, apikey):
+    def add_key(
+        self,
+        api_key,
+        api_base=None,
+    ):
+        if self.api_type == "azure":
+            assert (
+                api_base is not None
+            ), "api_base must be specified when api_type is azure. This is an endpoint URL provided in Azure portal."
         item = {}
-        item["type"] = "openai"
-        item["apikey"] = apikey
+        item["api_key"] = api_key
+        item["api_base"] = api_base
         item["last_called"] = time.mktime(time.gmtime())
         item["retry_count"] = 0
         item["available_time"] = item["last_called"] + self._wait_time(
@@ -126,7 +154,14 @@ class FilmConfig:
         elif mode == "Caching":
             keys = keys_Caching
 
-        return {key: value for key, value in config_dict.items() if key in keys}
+        result = {key: value for key, value in config_dict.items() if key in keys}
+
+        # take care of azure
+        if self.api_type == "azure":
+            del result["model"]
+            result["deployment_id"] = self.azure_deployment_id
+
+        return result
 
 
 class FilmEmbedConfig(FilmConfig):
