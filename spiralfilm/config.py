@@ -168,11 +168,17 @@ class FilmEmbedConfig(FilmConfig):
     def __init__(
         self,
         model="text-embedding-ada-002",
+        api_type="openai",
+        azure_deployment_id=None,
+        azure_api_version=None,
         use_cache=False,
     ):
         super().__init__(
             model=model,
             use_cache=use_cache,
+            api_type=api_type,
+            azure_deployment_id=azure_deployment_id,
+            azure_api_version=azure_api_version,
         )
 
     def to_dict(self, mode="APICalling"):
