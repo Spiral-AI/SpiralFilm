@@ -4,7 +4,7 @@ import time
 import logging
 import openai
 import tiktoken
-import re
+import tqdm
 import logging
 import os
 import pickle
@@ -104,8 +104,16 @@ class FilmEmbed:
         ]
         if len(messages_to_call) == 0:
             api_results = {"data": []}
+        elif self.config.api_type == "azure":
+            api_results = self._split_for_azure(
+                messages_to_call,
+                self.config,
+            )
         else:
-            api_results = self._call_with_retry(messages_to_call, config=self.config)
+            api_results = self._call_with_retry(
+                messages_to_call,
+                config=self.config,
+            )
 
         # Parse the result
         self.results = []
@@ -153,6 +161,22 @@ class FilmEmbed:
             openai.api_base = apikey["api_base"]
             openai.api_version = self.config.azure_api_version
         return
+
+    def _split_for_azure(self, messages, config):
+        """
+        Azure OpenAI API accepts up to 16 messages per request.
+        """
+        azure_limit = 16
+        # split messages into chunks of 16
+        messages_chunks = [
+            messages[i : i + azure_limit] for i in range(0, len(messages), azure_limit)
+        ]
+        # call _call_with_retry multiple times
+        results = []
+        for messages_chunk in tqdm.tqdm(messages_chunks, desc="Azure API call"):
+            result = self._call_with_retry(messages_chunk, config)
+            results += result["data"]
+        return {"data": results}
 
     def _call_with_retry(self, messages, config):
         """

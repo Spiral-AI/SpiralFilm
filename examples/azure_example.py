@@ -11,10 +11,12 @@ config = FilmConfig(
     azure_api_version="2023-05-15",  # Find this from https://learn.microsoft.com/ja-jp/azure/ai-services/openai/reference
 )
 
-config.add_key(
-    "PUT-YOUR-KEY-HERE",  # Azure portal provides two keys. Take one of them.
-    api_base="https://PUT-YOUR-BASE-URL-HERE.openai.azure.com/",  # Azure portal provides this.
-)
+# You can set your api key here.
+# also you can set them as environment variables: AZURE_API_KEY, AZURE_API_BASE
+# config.add_key(
+#    "PUT-YOUR-KEY-HERE",  # Azure portal provides two keys. Take one of them.
+#    api_base="https://PUT-YOUR-BASE-URL-HERE.openai.azure.com/",  # Azure portal provides this.
+# )
 
 f = FilmCore(
     prompt="""
