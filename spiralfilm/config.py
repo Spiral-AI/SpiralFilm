@@ -1,4 +1,8 @@
-import time, random, os
+import time
+import os
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 # configは、繰り返し使える設定変数を指定します。
