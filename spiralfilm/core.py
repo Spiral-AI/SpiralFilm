@@ -20,13 +20,16 @@ import openai
 import tiktoken
 import tqdm
 import re
-import logging
 import os
 import pickle
 import hashlib
 import asyncio
 from threading import Lock
 from .config import FilmConfig
+
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class FilmCore:
@@ -165,7 +168,7 @@ class FilmCore:
                     (str(messages) + str(self.config.to_dict(mode="Caching"))).encode()
                 ).hexdigest()
                 if message_hash in self.cache:
-                    logging.info("Cache hit.")
+                    logger.info("Cache hit.")
                     self.result = self.cache[message_hash]
                     is_cache_hit = True
 
@@ -187,7 +190,7 @@ class FilmCore:
         self.finished_reason = self.result["choices"][0]["finish_reason"]
         self.token_usages = self.result["usage"]
 
-        logging.info(
+        logger.info(
             f"Prompt: {self.prompt}\n\n"
             + f"Result: {self.result}\n\n"
             + f"Time taken: {end_time - start_time} sec."
@@ -298,7 +301,7 @@ class FilmCore:
             self._set_api(apikey)
 
             if time_to_wait > 0:
-                logging.warning(f"Waiting for {time_to_wait}s...")
+                logger.warning(f"Waiting for {time_to_wait}s...")
                 time.sleep(time_to_wait)
 
             try:
@@ -315,9 +318,9 @@ class FilmCore:
                 openai.error.APIConnectionError,
             ) as err:
                 self.config.update_apikey(apikey, status="failure")
-                logging.warning(f"Retryable Error: {err}")
+                logger.warning(f"Retryable Error: {err}")
             except Exception as err:
-                logging.error(f"Error: {err}")
+                logger.error(f"Error: {err}")
                 raise
         raise Exception("Max retries exceeded.")
 
