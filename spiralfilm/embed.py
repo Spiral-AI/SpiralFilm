@@ -1,7 +1,6 @@
 # このクラスは、embeddingを行うための薄いラッパーを提供します
 
 import time
-import logging
 import openai
 import tiktoken
 import tqdm
@@ -12,6 +11,9 @@ import hashlib
 import asyncio
 from threading import Lock
 from .config import FilmEmbedConfig
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class FilmEmbed:
@@ -92,7 +94,7 @@ class FilmEmbed:
                     ).hexdigest()
                     hash_dict[message] = message_hash
                     if message_hash in self.cache:
-                        logging.info(f"Cache hit.: {message}")
+                        logger.info(f"Cache hit.: {message}")
                         result = self.cache[message_hash]
             cached_results.append(result)
 
@@ -136,7 +138,7 @@ class FilmEmbed:
 
         end_time = time.time()
 
-        logging.info(
+        logger.info(
             f"Messages: {messages}\n\n"
             + f"Results: {self.results}\n\n"
             + f"Time taken: {end_time - start_time} sec."
@@ -196,7 +198,7 @@ class FilmEmbed:
             self._set_api(apikey)
 
             if time_to_wait > 0:
-                logging.info(f"Waiting for {time_to_wait}s...")
+                logger.info(f"Waiting for {time_to_wait}s...")
                 time.sleep(time_to_wait)
 
             try:
@@ -210,9 +212,9 @@ class FilmEmbed:
                 openai.error.APIConnectionError,
             ) as err:
                 self.config.update_apikey(apikey, status="failure")
-                logging.warning(f"Retryable Error: {err}")
+                logger.warning(f"Retryable Error: {err}")
             except Exception as err:
-                logging.error(f"Error: {err}")
+                logger.error(f"Error: {err}")
                 raise
         raise Exception("Max retries exceeded.")
 
