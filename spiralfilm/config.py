@@ -63,14 +63,34 @@ class FilmConfig:
 
     def get_apikey(self):
         if self.apikeys == []:
-            # check if os.environ["OPENAI_API_KEY"] is set.
-            if not "OPENAI_API_KEY" in os.environ:
-                raise ValueError("OPENAI_API_KEY is not set in environment variables.")
+            if self.api_type == "openai":
+                # check if os.environ["OPENAI_API_KEY"] is set.
+                if not "OPENAI_API_KEY" in os.environ:
+                    raise ValueError(
+                        "OPENAI_API_KEY is not set in environment variables."
+                    )
 
-            self.add_key(os.environ["OPENAI_API_KEY"])
-            return (
-                self.get_apikey()
-            )  # Doing some trick. This call envokes the else statements from the next lines.
+                self.add_key(os.environ["OPENAI_API_KEY"])
+                return (
+                    self.get_apikey()
+                )  # Doing some trick. This call envokes the else statements from the next lines.
+            elif self.api_type == "azure":
+                # check if the keys are set
+                if ("AZURE_API_KEY" not in os.environ) or (
+                    "AZURE_API_BASE" not in os.environ
+                ):
+                    raise ValueError(
+                        "Set AZURE_API_KEY and AZURE_API_BASE in environment variables."
+                    )
+
+                self.add_key(
+                    api_key=os.environ["AZURE_API_KEY"],
+                    api_base=os.environ["AZURE_API_BASE"],
+                )
+                return (
+                    self.get_apikey()
+                )  # Doing some trick. This call envokes the else statements from the next lines.
+
         else:
             # Sort the apikeys by available time
             self.apikeys.sort(key=lambda x: x["available_time"])
@@ -193,4 +213,10 @@ class FilmEmbedConfig(FilmConfig):
         elif mode == "Caching":
             keys = ["model"]
 
-        return {key: value for key, value in config_dict.items() if key in keys}
+        result = {key: value for key, value in config_dict.items() if key in keys}
+        # take care of azure
+        if self.api_type == "azure":
+            del result["model"]
+            result["deployment_id"] = self.azure_deployment_id
+
+        return result
