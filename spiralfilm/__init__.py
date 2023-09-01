@@ -4,6 +4,7 @@
 from .core import FilmCore
 from .config import FilmConfig
 from .embed import FilmEmbed, FilmEmbedConfig
+from .parser import FilmParser
 
 # Specify the version of the package
-__version__ = "0.1.14"
+__version__ = "0.1.15"
