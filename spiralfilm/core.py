@@ -26,6 +26,7 @@ import hashlib
 import asyncio
 from threading import Lock
 from .config import FilmConfig
+from .parser import FilmParser
 
 import logging
 
@@ -39,6 +40,7 @@ class FilmCore:
         history=[],
         system_prompt=None,
         config=FilmConfig(),
+        parser=None,
     ):
         """
         Args:
@@ -47,7 +49,7 @@ class FilmCore:
                             It is expected that the user's input and the system's response will alternate.
             system_prompt (str): The system prompt to be sent to the API. If None, default prompt is used.
             config (FilmConfig): A FilmConfig object.
-
+            parser (FilmParser): A FilmParser object.
         """
         assert (
             len(history) % 2 == 0
@@ -64,6 +66,7 @@ class FilmCore:
         else:
             self.system_prompt = system_prompt
         self.config = config
+        self.parser = parser
 
         self.result = None
         self.result_messages = None
@@ -186,7 +189,8 @@ class FilmCore:
         end_time = time.time()
 
         # Parse the result
-        self.result_content = self.result["choices"][0]["message"]["content"]
+        result_content = self.result["choices"][0]["message"]["content"]
+        self.result_content = result_content
         self.finished_reason = self.result["choices"][0]["finish_reason"]
         self.token_usages = self.result["usage"]
 
@@ -195,7 +199,16 @@ class FilmCore:
             + f"Result: {self.result}\n\n"
             + f"Time taken: {end_time - start_time} sec."
         )
-        return self.result_content
+
+        if self.parser is not None:
+            try:
+                parsed_result = self.parser.parse(result_content, self.config)
+                return parsed_result
+            except Exception as e:
+                logger.error(f"Parse error: {e}")
+                raise e
+        else:
+            return result_content  # don't return self.result_content, which may be changed by the other threads
 
     def stream(self, placeholders={}):
         """
@@ -216,39 +229,48 @@ class FilmCore:
             stream=True,
         )
 
-        self.result_content = ""
+        result_content = ""
 
         for result in stream_object:
             if "content" in result["choices"][0]["delta"]:
                 newtoken = result["choices"][0]["delta"]["content"]
                 self.finished_reason = result["choices"][0]["finish_reason"]
-                self.result_content += newtoken
+                result_content += newtoken
                 yield newtoken
             else:
-                return
+                if self.parser is not None:
+                    try:
+                        parsed_result = self.parser.parse(result_content, self.config)
+                        return parsed_result
+                    except Exception as e:
+                        logger.error(f"Parse error: {e}")
+                        raise e
+                else:
+                    self.result_content = result_content
+                    return result_content  # don't return self.result_content, which may be changed by the other threads
 
     async def run_async(self, placeholders={}):
         loop = asyncio.get_event_loop()
         result = await loop.run_in_executor(None, self.run, placeholders)
         return result
 
-    async def _run_with_semaphore(self, placeholders, progress):
-        async with self.semaphore:
-            result = await self.run_async(placeholders)
-            progress.update(1)  # タスクが完了したらプログレスバーを更新
-            return result
-
     def run_parallel(self, placeholders_list=[]):
+        async def _run_with_semaphore(placeholders, progress, semaphore):
+            async with semaphore:
+                result = await self.run_async(placeholders)
+                progress.update(1)  # タスクが完了したらプログレスバーを更新
+                return result
+
         loop = asyncio.get_event_loop()
         if loop.is_running():
             loop.close()
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
 
-        self.semaphore = asyncio.Semaphore(self.config.max_queues)
+        semaphore = asyncio.Semaphore(self.config.max_queues)
         with tqdm.tqdm(total=len(placeholders_list), desc="Processing") as progress:
             tasks = [
-                self._run_with_semaphore(placeholders, progress)
+                _run_with_semaphore(placeholders, progress, semaphore)
                 for placeholders in placeholders_list
             ]
             results = loop.run_until_complete(asyncio.gather(*tasks))

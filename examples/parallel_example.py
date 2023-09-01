@@ -17,3 +17,6 @@ results = f.run_parallel(placeholders_list=placeholders_list)
 
 print(results)
 print(len(results))
+
+print("----")
+print(f.result_content)
