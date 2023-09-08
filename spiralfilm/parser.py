@@ -1,4 +1,3 @@
-import re
 import json
 import logging
 
@@ -12,13 +11,14 @@ class FilmParser:
         format,
         prefix="",
         sanity_check=None,
-        remove_prefix=["- "],
+        line_prefix=["- "],
     ):
         """
         format: lines, markdown, json
         prefix: prefix to be added at the beginning
         sanity_check: function to check if the output is valid. Use 'assert' statement to check.
         max_retry: max number of retry. If sanity_check fails, retry until this number is reached. Set to 0 to disable retry.
+        line_prefix: list of prefix to be recognized as a line. Used only when format is 'lines'.
         """
         assert format in [
             "lines",
@@ -28,7 +28,8 @@ class FilmParser:
         self.format = format
         self.prefix = prefix
         self.sanity_check = sanity_check
-        self.remove_prefix = remove_prefix
+        self.list_prefix = line_prefix
+
         self.set_retry_prompt(
             """
 Please process the input text to ensure it strictly adheres to the {{format}} format.
@@ -91,11 +92,14 @@ Please process the input text to ensure it strictly adheres to the {{format}} fo
             list of str
         """
         lines = text.split("\n")
-        lines = [line for line in lines if line != ""]  # remove empty lines
         lines = [line.strip() for line in lines]  # remove spaces
-        # remove prefix if line starts with it
-        for prefix in self.remove_prefix:
-            lines = [line[len(prefix) :] for line in lines if line.startswith(prefix)]
+        new_lines = []
+        for line in lines:
+            for prefix in self.list_prefix:
+                if line.startswith(prefix):
+                    new_lines.append(line[len(prefix) :])
+                    break
+        lines = [line.strip() for line in new_lines]  # remove spaces
         return lines
 
     def parse_json(self, text):
