@@ -28,7 +28,10 @@ class FilmParser:
         self.format = format
         self.prefix = prefix
         self.sanity_check = sanity_check
-        self.list_prefix = line_prefix
+        if isinstance(line_prefix, str):
+            self.list_prefix = [line_prefix]
+        else:
+            self.list_prefix = line_prefix
 
         self.set_retry_prompt(
             """
