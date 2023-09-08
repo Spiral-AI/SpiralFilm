@@ -16,3 +16,11 @@ f = FilmCore(
 ).run(placeholders={"user_name": "Tom"})
 
 print(f)
+
+new_config = FilmConfig.create_from(config, model="gpt-3.5-turbo")
+
+f = FilmCore(
+    prompt=_template,
+    config=new_config,
+).run(placeholders={"user_name": "Tom"})
+print(f)
