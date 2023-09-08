@@ -1,6 +1,7 @@
 import time
 import os
 import logging
+from copy import copy
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +59,17 @@ class FilmConfig:
         self.cache_path = ".cache.pickle"
         self.apikeys = []
         self.selected_apikey = None  # required to track if this is openai or azure
+
+    @staticmethod
+    def create_from(config, **kwargs):
+        new_config = copy(config)
+        for key, value in kwargs.items():
+            if hasattr(new_config, key):
+                setattr(new_config, key, value)
+            else:
+                raise ValueError(f"Unknown attribute: {key}")
+
+        return new_config
 
     def _wait_time(self, retry_count):
         if retry_count == 0:
