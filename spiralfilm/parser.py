@@ -96,6 +96,8 @@ Please process the input text to ensure it strictly adheres to the {{format}} fo
         """
         lines = text.split("\n")
         lines = [line.strip() for line in lines]  # remove spaces
+        if len(self.list_prefix) == 0:
+            return lines
         new_lines = []
         for line in lines:
             for prefix in self.list_prefix:
