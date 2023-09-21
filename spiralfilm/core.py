@@ -41,6 +41,7 @@ class FilmCore:
         system_prompt=None,
         config=FilmConfig(),
         parser=None,
+        override_params={},
     ):
         """
         Args:
@@ -74,6 +75,7 @@ class FilmCore:
         self.finished_reason = None
         self.token_usages = None
         self.cache_lock = Lock()  # Create a lock for cache
+        self.override_params = override_params
 
         if self.config.use_cache:
             start_time = time.time()
@@ -168,7 +170,15 @@ class FilmCore:
         if self.config.use_cache:
             with self.cache_lock:  # Acquire lock when accessing cache
                 message_hash = hashlib.md5(
-                    (str(messages) + str(self.config.to_dict(mode="Caching"))).encode()
+                    (
+                        str(messages)
+                        + str(
+                            self.config.to_dict(
+                                mode="Caching",
+                                override_params=self.override_params,
+                            )
+                        )
+                    ).encode()
                 ).hexdigest()
                 if message_hash in self.cache:
                     logger.info("Cache hit.")
@@ -225,7 +235,7 @@ class FilmCore:
 
         stream_object = openai.ChatCompletion.create(
             messages=messages,
-            **self.config.to_dict(),
+            **self.config.to_dict(override_params=self.override_params),
             stream=True,
         )
 
@@ -329,7 +339,7 @@ class FilmCore:
             try:
                 result = openai.ChatCompletion.create(
                     messages=messages,
-                    **config.to_dict(),
+                    **config.to_dict(override_params=self.override_params),
                 )
                 self.config.update_apikey(apikey, status="success")
                 return result
