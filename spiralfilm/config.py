@@ -155,8 +155,14 @@ class FilmConfig:
         )
         self.apikeys.append(item)
 
-    def to_dict(self, mode="APICalling"):
-        """Converts the config object to a dictionary representation for API call."""
+    def to_dict(self, mode="APICalling", override_params={}):
+        """
+        Converts the config object to a dictionary representation for API call.
+
+        Args:
+            mode (str): Either "APICalling" or "Caching". If "APICalling", the dictionary will contain all the parameters required for API call. If "Caching", the dictionary will contain only the parameters required for caching.
+            override_params (dict): A dictionary of parameters to override the config object. This is useful when you want to override the parameters for a specific API call.
+        """
         assert mode in ["APICalling", "Caching"]
 
         config_dict = vars(self).copy()
@@ -197,6 +203,11 @@ class FilmConfig:
             del result["model"]
             result["deployment_id"] = self.azure_deployment_id
 
+        # override parameters
+        for key, value in override_params.items():
+            assert key in keys, f"override_params contain invalid parameter: {key}"
+            result[key] = value
+
         return result
 
 
@@ -217,8 +228,10 @@ class FilmEmbedConfig(FilmConfig):
             azure_api_version=azure_api_version,
         )
 
-    def to_dict(self, mode="APICalling"):
-        """Converts the config object to a dictionary representation for API call."""
+    def to_dict(self, mode="APICalling", override_params={}):
+        """
+        Converts the config object to a dictionary representation for API call.
+        """
         assert mode in ["APICalling", "Caching"]
 
         config_dict = vars(self).copy()
@@ -234,5 +247,10 @@ class FilmEmbedConfig(FilmConfig):
         if self.api_type == "azure":
             del result["model"]
             result["deployment_id"] = self.azure_deployment_id
+
+        # override parameters
+        for key, value in override_params.items():
+            assert key in keys, f"override_params contain invalid parameter: {key}"
+            result[key] = value
 
         return result
