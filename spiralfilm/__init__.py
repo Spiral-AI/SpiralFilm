@@ -7,4 +7,4 @@ from .embed import FilmEmbed, FilmEmbedConfig
 from .parser import FilmParser
 
 # Specify the version of the package
-__version__ = "0.1.20"
+__version__ = "0.1.21"
