@@ -145,15 +145,17 @@ class FilmConfig:
             assert (
                 api_base is not None
             ), "api_base must be specified when api_type is azure. This is an endpoint URL provided in Azure portal."
-        item = {}
-        item["api_key"] = api_key
-        item["api_base"] = api_base
-        item["last_called"] = time.mktime(time.gmtime())
-        item["retry_count"] = 0
-        item["available_time"] = item["last_called"] + self._wait_time(
-            item["retry_count"]
-        )
-        self.apikeys.append(item)
+
+        for api_key_item in api_key.split(","):
+            item = {}
+            item["api_key"] = api_key_item.strip()
+            item["api_base"] = api_base
+            item["last_called"] = time.mktime(time.gmtime())
+            item["retry_count"] = 0
+            item["available_time"] = item["last_called"] + self._wait_time(
+                item["retry_count"]
+            )
+            self.apikeys.append(item)
 
     def to_dict(self, mode="APICalling", override_params={}):
         """
