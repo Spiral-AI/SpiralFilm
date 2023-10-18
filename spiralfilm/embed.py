@@ -11,6 +11,7 @@ import hashlib
 import asyncio
 from threading import Lock
 from .config import FilmEmbedConfig
+from .errors import *
 import logging
 
 logger = logging.getLogger(__name__)
@@ -216,7 +217,7 @@ class FilmEmbed:
             except Exception as err:
                 logger.error(f"Error: {err}")
                 raise
-        raise Exception("Max retries exceeded.")
+        raise MaxRetriesExceededError("Max retries exceeded.")
 
     def num_tokens(self, texts):
         """Returns the number of tokens.
