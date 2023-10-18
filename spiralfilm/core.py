@@ -302,12 +302,16 @@ class FilmCore:
                 else:
                     yield result
             except Exception as e:
-                print(f"An error occurred: {e}")
+                # print(f"An error occurred: {e}")
+                logger.error(f"An error occurred: {e}")
                 break
 
     def _set_api(self, apikey):
         if self.config.api_type == "openai":
+            openai.api_type = "open_ai"
             openai.api_key = apikey["api_key"]
+            openai.api_base = "https://api.openai.com/v1"
+            openai.api_version = None
         elif self.config.api_type == "azure":
             openai.api_type = "azure"
             openai.api_key = apikey["api_key"]
@@ -344,9 +348,15 @@ class FilmCore:
                 )
                 # Check the finished reason
                 if result["choices"][0]["finish_reason"] == "content_filter":
+                    self.config.update_apikey(
+                        apikey, status="success"
+                    )  # API itself works fine. No need to avoid next time.
                     raise ContentFilterError(
                         f"Response has a finish reason of 'content_filter'\n{messages}"
                     )
+                else:
+                    self.config.update_apikey(apikey, status="success")
+                    return result
             except (
                 openai.error.RateLimitError,
                 openai.error.Timeout,
