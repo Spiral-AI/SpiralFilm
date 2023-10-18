@@ -141,15 +141,29 @@ class FilmConfig:
         api_key,
         api_base=None,
     ):
+        api_key_and_base = []
         if self.api_type == "azure":
             assert (
                 api_base is not None
             ), "api_base must be specified when api_type is azure. This is an endpoint URL provided in Azure portal."
 
-        for api_key_item in api_key.split(","):
+            # If multiple api_key is specified, api_base should be the comma separated list with the same number of items.
+            assert len(api_key.split(",")) == len(
+                api_base.split(",")
+            ), "The number of api_key and api_base must be the same."
+
+            api_key_and_base = list(zip(api_key.split(","), api_base.split(",")))
+        else:
+            api_keys = api_key.split(",")
+            api_key_and_base = [(api_key, None) for api_key in api_keys]
+
+        # for api_key_item, api_base_item in zip(api_key.split(","), api_base.split(",")):
+        for api_key_item, api_base_item in api_key_and_base:
             item = {}
             item["api_key"] = api_key_item.strip()
-            item["api_base"] = api_base
+            item["api_base"] = (
+                api_base_item.strip() if api_base_item is not None else None
+            )
             item["last_called"] = time.mktime(time.gmtime())
             item["retry_count"] = 0
             item["available_time"] = item["last_called"] + self._wait_time(
