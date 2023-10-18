@@ -345,7 +345,7 @@ class FilmCore:
                 # Check the finished reason
                 if result["choices"][0]["finish_reason"] == "content_filter":
                     raise ContentFilterError(
-                        "Response has a finish reason of 'content_filter'"
+                        f"Response has a finish reason of 'content_filter'\n{messages}"
                     )
             except (
                 openai.error.RateLimitError,
