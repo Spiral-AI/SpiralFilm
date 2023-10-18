@@ -27,6 +27,7 @@ import asyncio
 from threading import Lock
 from .config import FilmConfig
 from .parser import FilmParser
+from .errors import *
 
 import logging
 
@@ -341,8 +342,11 @@ class FilmCore:
                     messages=messages,
                     **config.to_dict(override_params=self.override_params),
                 )
-                self.config.update_apikey(apikey, status="success")
-                return result
+                # Check the finished reason
+                if result["choices"][0]["finish_reason"] == "content_filter":
+                    raise ContentFilterError(
+                        "Response has a finish reason of 'content_filter'"
+                    )
             except (
                 openai.error.RateLimitError,
                 openai.error.Timeout,
@@ -351,10 +355,13 @@ class FilmCore:
             ) as err:
                 self.config.update_apikey(apikey, status="failure")
                 logger.warning(f"Retryable Error: {err}")
+            except ContentFilterError as cfe:
+                logger.error(f"Error due to content filter: {cfe}")
+                raise
             except Exception as err:
                 logger.error(f"Error: {err}")
                 raise
-        raise Exception("Max retries exceeded.")
+        raise MaxRetriesExceededError("Max retries exceeded.")
 
     def _placeholder(self, prompt, placeholders):
         """
