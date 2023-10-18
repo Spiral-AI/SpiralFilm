@@ -8,4 +8,4 @@ from .parser import FilmParser
 from .errors import MaxRetriesExceededError, ContentFilterError
 
 # Specify the version of the package
-__version__ = "0.1.22"
+__version__ = "0.1.23"
