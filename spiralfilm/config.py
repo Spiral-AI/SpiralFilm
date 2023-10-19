@@ -46,7 +46,7 @@ class FilmConfig:
         self.top_p = top_p
         self.n = n
         # self.stream = stream
-        self.stop = stop
+        self.stop = [stop] if isinstance(stop, str) else stop
         self.max_tokens = max_tokens
         self.presence_penalty = presence_penalty
         self.frequency_penalty = frequency_penalty

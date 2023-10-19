@@ -183,31 +183,38 @@ class FilmCore:
                 ).hexdigest()
                 if message_hash in self.cache:
                     logger.info("Cache hit.")
-                    self.result = self.cache[message_hash]
+                    raw_result = self.cache[message_hash]
                     is_cache_hit = True
 
         # call API if cache is not hit
         if is_cache_hit == False:
-            self.result = self._call_with_retry(messages, config=self.config)
+            raw_result = self._call_with_retry(messages, config=self.config)
 
             if self.config.use_cache:
                 with self.cache_lock:  # Acquire lock when updating cache
                     # message_hash is already calcuated
-                    self.cache[message_hash] = self.result
+                    self.cache[message_hash] = raw_result
                     with open(self.config.cache_path, "wb") as f:
                         pickle.dump(self.cache, f)
 
         end_time = time.time()
 
         # Parse the result
-        result_content = self.result["choices"][0]["message"]["content"]
+        result_content = raw_result["choices"][0]["message"]["content"]
+        self.result = raw_result
         self.result_content = result_content
-        self.finished_reason = self.result["choices"][0]["finish_reason"]
-        self.token_usages = self.result["usage"]
+        self.finished_reason = raw_result["choices"][0]["finish_reason"]
+        self.token_usages = raw_result["usage"]
+
+        # Check stopwords (OpenAI sometimes returns setences that contain stopwords)
+        if self.config.stop is not None:
+            for stopword in self.config.stop:
+                if result_content.startswith(stopword):
+                    result_content = ""
 
         logger.info(
             f"Prompt: {self.prompt}\n\n"
-            + f"Result: {self.result}\n\n"
+            + f"Result: {raw_result}\n\n"
             + f"Time taken: {end_time - start_time} sec."
         )
 
@@ -247,6 +254,14 @@ class FilmCore:
                 newtoken = result["choices"][0]["delta"]["content"]
                 self.finished_reason = result["choices"][0]["finish_reason"]
                 result_content += newtoken
+                is_stop = False
+                if self.config.stop is not None:
+                    for stopword in self.config.stop:
+                        if result_content.startswith(stopword):
+                            is_stop = True
+                            break
+                if is_stop:
+                    break
                 yield newtoken
             else:
                 if self.parser is not None:
