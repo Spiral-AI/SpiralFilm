@@ -12,8 +12,20 @@ print("---- original text ----")
 print(text)
 
 print()
-print("---- max_chars=20 ----")
-print(TextCutter(text, max_chars=20))
+print("---- max_chars=40: strategy=chars:start ----")
+print(TextCutter(text, max_chars=40, strategy="chars:start"))
+
+print()
+print("---- max_chars=40: strategy=chars:end ----")
+print(TextCutter(text, max_chars=40, strategy="chars:end"))
+
+print()
+print("---- max_chars=40: strategy=lines:start ----")
+print(TextCutter(text, max_chars=40, strategy="lines:start"))
+
+print()
+print("---- max_chars=40: strategy=lines:end ----")
+print(TextCutter(text, max_chars=40, strategy="lines:end"))
 
 print()
 print("---- max_lines=3 ----")
