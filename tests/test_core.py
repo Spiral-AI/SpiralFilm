@@ -27,7 +27,7 @@ def mock_env_vars():
 
 
 # FilmCore.run メソッドのテスト
-def test_run(film_core_instance, mock_openai_api):
+def test_run(film_core_instance, mock_openai_api, mock_env_vars):
     # 期待される応答をモックする
     expected_response = {
         "choices": [
