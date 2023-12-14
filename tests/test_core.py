@@ -19,6 +19,13 @@ def film_core_instance():
     return FilmCore(prompt, config=config)
 
 
+# 環境変数を模擬するためのフィクスチャ
+@pytest.fixture
+def mock_env_vars():
+    with patch.dict("os.environ", {"OPENAI_API_KEY": "fake-api-key"}):
+        yield
+
+
 # FilmCore.run メソッドのテスト
 def test_run(film_core_instance, mock_openai_api):
     # 期待される応答をモックする
