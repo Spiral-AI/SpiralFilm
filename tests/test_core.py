@@ -1,33 +1,19 @@
 import pytest
-from unittest.mock import patch, Mock
+import os
+from unittest.mock import patch, MagicMock
 from spiralfilm.core import FilmCore
 from spiralfilm.config import FilmConfig
 
 
-# モックオブジェクトを使ってopenai APIの呼び出しをシミュレートするためのフィクスチャ
-@pytest.fixture
-def mock_openai_api():
-    with patch("spiralfilm.core.openai") as mock:
-        yield mock
-
-
-# FilmCore クラスのインスタンスを生成するためのフィクスチャ
-@pytest.fixture
-def film_core_instance():
-    prompt = "Hello, World! {{variable1}} is {{variable2}}."
-    config = FilmConfig(model="gpt-4", temperature=0.9, max_tokens=100)
-    return FilmCore(prompt, config=config)
-
-
-# 環境変数を模擬するためのフィクスチャ
-@pytest.fixture
-def mock_env_vars():
-    with patch.dict("os.environ", {"OPENAI_API_KEY": "fake-api-key"}):
-        yield
+# 環境のセットアップ状況の確認
+def test_env_setup():
+    assert "OPENAI_API_KEY" in os.environ.keys()
+    assert "OPENAI_API_KEY_1" in os.environ.keys()
+    assert "OPENAI_API_KEY_2" in os.environ.keys()
 
 
 # 最もシンプルな生成のテスト
-def test_run(mock_openai_api, mock_env_vars):
+def test_run():
     # 期待される応答をモックする: https://platform.openai.com/docs/api-reference/making-requests
     expected_response = {
         "id": "chatcmpl-abc123",
@@ -37,17 +23,16 @@ def test_run(mock_openai_api, mock_env_vars):
         "usage": {"prompt_tokens": 13, "completion_tokens": 7, "total_tokens": 20},
         "choices": [
             {
-                "message": {"role": "assistant", "content": "Hi, I'm feeling good!"},
+                "message": {"role": "assistant", "content": "Yes"},
                 "finish_reason": "stop",
                 "index": 0,
             }
         ],
     }
-    mock_openai_api.ChatCompletion.create.return_value = expected_response
 
-    # FilmCore クラスのインスタンスを生成。なるべく多く引数を設定してみる。
+    # FilmCore クラスのインスタンスを生成
     film_core_instance = FilmCore(
-        prompt="""Hi {{name}}. Talk as you want.""",
+        prompt="""Hi {{name}}. Just answer 'Yes'""",
         config=FilmConfig(model="gpt-3.5-turbo-1106", temperature=0.0, max_tokens=100),
     )
 
@@ -55,16 +40,17 @@ def test_run(mock_openai_api, mock_env_vars):
     result = film_core_instance.run({"name": "Tom"})
 
     # 結果が期待通りであることをアサートする
-    assert result == expected_response["choices"][0]["message"]["content"]
-    assert (
-        film_core_instance.finished_reason
-        == expected_response["choices"][0]["finish_reason"]
-    )
-    assert film_core_instance.token_usages == expected_response["usage"]
+    assert result == "Yes"
+    assert film_core_instance.finished_reason == "stop"
+    assert film_core_instance.token_usages == {
+        "prompt_tokens": 25,
+        "completion_tokens": 1,
+        "total_tokens": 26,
+    }
 
 
 # _placeholder メソッドのテスト
-def test_placeholder(mock_openai_api):
+def test_placeholder():
     # プロンプトに含まれるプレースホルダーを置き換え
     prompt = "{{variable1}} is {{variable2}}. And {{variable3}} is {{variable4}}."
 
@@ -77,7 +63,6 @@ def test_placeholder(mock_openai_api):
         "variable3": "winter",
         "variable4": "cold",
     }
-    print(fc.placeholders())
     assert fc.placeholders() == ["variable1", "variable2", "variable3", "variable4"]
     assert fc._placeholder(prompt, placeholders) == "summer is hot. And winter is cold."
 
