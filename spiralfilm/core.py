@@ -399,12 +399,17 @@ class FilmCore:
         Returns:
             The prompt with the placeholders replaced with their values.
         """
+        # check if all placeholders are found
+        expected_placeholders = self.placeholders()
+        if not set(expected_placeholders) == set(placeholders.keys()):
+            raise ValueError(
+                f"Expected placeholders: {expected_placeholders}\n"
+                + f"Given placeholders: {placeholders.keys()}"
+            )
+        # replace placeholders
         for key, value in placeholders.items():
             # re.escape is used to escape special characters in 'key'
             pattern = f"{{{{{re.escape(key)}}}}}"
-
-            if not re.search(pattern, prompt):
-                raise ValueError(f"Placeholder '{key}' not found in the prompt.")
 
             prompt = re.sub(pattern, value, prompt)
         return prompt
