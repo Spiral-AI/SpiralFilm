@@ -4,7 +4,6 @@
 from .core import FilmCore
 from .config import FilmConfig
 from .embed import FilmEmbed, FilmEmbedConfig
-from .parser import FilmParser
 from .utils import TextCutter
 from .errors import MaxRetriesExceededError, ContentFilterError
 

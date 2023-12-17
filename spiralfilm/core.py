@@ -26,7 +26,6 @@ import hashlib
 import asyncio
 from threading import Lock
 from .config import FilmConfig
-from .parser import FilmParser
 from .errors import *
 
 import logging
@@ -41,7 +40,6 @@ class FilmCore:
         history=[],
         system_prompt=None,
         config=FilmConfig(),
-        parser=None,
         override_params={},
     ):
         """
@@ -51,7 +49,6 @@ class FilmCore:
                             It is expected that the user's input and the system's response will alternate.
             system_prompt (str): The system prompt to be sent to the API. If None, default prompt is used.
             config (FilmConfig): A FilmConfig object.
-            parser (FilmParser): A FilmParser object.
         """
         assert (
             len(history) % 2 == 0
@@ -68,7 +65,6 @@ class FilmCore:
         else:
             self.system_prompt = system_prompt
         self.config = config
-        self.parser = parser
 
         self.result = None
         self.result_messages = None
@@ -218,15 +214,7 @@ class FilmCore:
             + f"Time taken: {end_time - start_time} sec."
         )
 
-        if self.parser is not None:
-            try:
-                parsed_result = self.parser.parse(result_content, self.config)
-                return parsed_result
-            except Exception as e:
-                logger.error(f"Parse error: {e}")
-                raise e
-        else:
-            return result_content  # don't return self.result_content, which may be changed by the other threads
+        return result_content  # don't return self.result_content, which may be changed by the other threads
 
     def stream(self, placeholders={}):
         """
@@ -264,16 +252,8 @@ class FilmCore:
                     break
                 yield newtoken
             else:
-                if self.parser is not None:
-                    try:
-                        parsed_result = self.parser.parse(result_content, self.config)
-                        return parsed_result
-                    except Exception as e:
-                        logger.error(f"Parse error: {e}")
-                        raise e
-                else:
-                    self.result_content = result_content
-                    return result_content  # don't return self.result_content, which may be changed by the other threads
+                self.result_content = result_content
+                return result_content  # don't return self.result_content, which may be changed by the other threads
 
     async def run_async(self, placeholders={}):
         loop = asyncio.get_event_loop()
