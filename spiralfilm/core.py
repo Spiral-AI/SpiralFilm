@@ -52,9 +52,6 @@ class FilmCore:
             system_prompt (str): The system prompt to be sent to the API. If None, default prompt is used.
             config (FilmConfig): A FilmConfig object.
         """
-        assert (
-            len(history) % 2 == 0
-        ), "History must contain an even number of messages. The user's input and the system's response will alternate."
 
         assert config.model.startswith("gpt-4") or config.model.startswith(
             "gpt-3.5-turbo"
@@ -157,7 +154,9 @@ class FilmCore:
 
         # tokenだけ、仮にretryされた場合には累積で計算する (そうでないと、コストが間違う)
         self.token_usages = {
-            "prompt_tokens": self.num_tokens(messages),
+            "prompt_tokens": self.num_tokens_from_messages(
+                messages, model=self.config.model
+            ),
             "completion_tokens": 0,
             "total_tokens": 0,
         }
@@ -241,8 +240,14 @@ class FilmCore:
             self.save_cache(message_hash, self.result)
 
         # トークン数の計算
-        self.token_usages["total_tokens"] = (
-            self.token_usages["prompt_tokens"] + self.token_usages["completion_tokens"]
+        all_messages = self._messages(
+            history=messages + [{"role": "assistant", "content": self.result_content}]
+        )
+        self.token_usages["total_tokens"] = self.num_tokens_from_messages(
+            all_messages, model=self.config.model
+        )
+        self.token_usages["completion_tokens"] = (
+            self.token_usages["total_tokens"] - self.token_usages["prompt_tokens"]
         )
 
     async def run_async(self, placeholders={}):
@@ -362,18 +367,22 @@ class FilmCore:
         """
         return re.findall(r"\{\{(.+?)\}\}", self.prompt)
 
-    def _messages(self, prompt, history, system_prompt):
+    def _messages(self, prompt=None, history=None, system_prompt=None):
         """
         Generate messages to be sent to the API.
         Args:
             prompt (str): The prompt to be sent to the API.
-            history (list): A list of messages to be sent to the API before the prompt.
-                            It is expected that the user's input and the system's response will alternate.
+            history (list[dict]): A list of messages to be sent to the API before the prompt. Dict should have keys "role" and "content".
             system_prompt (str): The system prompt to be sent to the API. If None, default prompt is used.
         Returns:
             A list of messages to be sent to the API.
 
         Example:
+            history = [
+                {"role": "user", "content": "Hi."},
+                {"role": "user", "content": "Who won the world series in 2020?"},
+                {"role": "assistant", "content": "The Los Angeles Dodgers won the World Series in 2020."},
+            ]
             messages = [
                 {"role": "system", "content": "You are a helpful assistant."},
                 {"role": "user", "content": "Who won the world series in 2020?"},
@@ -382,18 +391,19 @@ class FilmCore:
             ]
         """
         messages = []
+
         # add system message
-        messages.append({"role": "system", "content": system_prompt})
+        if system_prompt is not None:
+            messages.append({"role": "system", "content": system_prompt})
 
         # add history
-        for idx, item in enumerate(history):
-            if idx % 2 == 0:
-                messages.append({"role": "user", "content": item})
-            else:
-                messages.append({"role": "assistant", "content": item})
+        if history is not None:
+            for item in history:
+                messages.append({"role": item["role"], "content": item["content"]})
 
         # add prompt
-        messages.append({"role": "user", "content": prompt})
+        if prompt is not None:
+            messages.append({"role": "user", "content": prompt})
 
         return messages
 
@@ -426,7 +436,10 @@ class FilmCore:
         See details:
         https://platform.openai.com/docs/models/gpt-4
         """
-        if self.config.model.startswith("gpt-4-32k"):
+
+        if self.config.model.startswith("gpt-4-1106-preview"):
+            return 128000
+        elif self.config.model.startswith("gpt-4-32k"):
             return 32768
         elif self.config.model.startswith("gpt-4"):
             return 8192
@@ -479,3 +492,49 @@ class FilmCore:
             with open(save_path, "w") as f:
                 f.write(return_string)
         return return_string
+
+    def num_tokens_from_messages(self, messages, model="gpt-3.5-turbo-0613"):
+        """Return the number of tokens used by a list of messages."""
+        try:
+            encoding = tiktoken.encoding_for_model(model)
+        except KeyError:
+            print("Warning: model not found. Using cl100k_base encoding.")
+            encoding = tiktoken.get_encoding("cl100k_base")
+        if model in {
+            "gpt-3.5-turbo-0613",
+            "gpt-3.5-turbo-16k-0613",
+            "gpt-4-0314",
+            "gpt-4-32k-0314",
+            "gpt-4-0613",
+            "gpt-4-32k-0613",
+        }:
+            tokens_per_message = 3
+            tokens_per_name = 1
+        elif model == "gpt-3.5-turbo-0301":
+            tokens_per_message = (
+                4  # every message follows <|start|>{role/name}\n{content}<|end|>\n
+            )
+            tokens_per_name = -1  # if there's a name, the role is omitted
+        elif "gpt-3.5-turbo" in model:
+            print(
+                "Warning: gpt-3.5-turbo may update over time. Returning num tokens assuming gpt-3.5-turbo-0613."
+            )
+            return self.num_tokens_from_messages(messages, model="gpt-3.5-turbo-0613")
+        elif "gpt-4" in model:
+            print(
+                "Warning: gpt-4 may update over time. Returning num tokens assuming gpt-4-0613."
+            )
+            return self.num_tokens_from_messages(messages, model="gpt-4-0613")
+        else:
+            raise NotImplementedError(
+                f"""num_tokens_from_messages() is not implemented for model {model}. See https://github.com/openai/openai-python/blob/main/chatml.md for information on how messages are converted to tokens."""
+            )
+        num_tokens = 0
+        for message in messages:
+            num_tokens += tokens_per_message
+            for key, value in message.items():
+                num_tokens += len(encoding.encode(value))
+                if key == "name":
+                    num_tokens += tokens_per_name
+        num_tokens += 3  # every reply is primed with <|start|>assistant<|message|>
+        return num_tokens

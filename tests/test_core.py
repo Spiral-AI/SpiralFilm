@@ -4,17 +4,15 @@ from unittest.mock import patch, MagicMock
 from spiralfilm.core import FilmCore
 from spiralfilm.config import FilmConfig
 import asyncio
+from openai import OpenAI
 
-
-# 環境のセットアップ状況の確認
-# def test_env_setup():
-#    assert "OPENAI_API_KEY" in os.environ.keys()
-#    assert "OPENAI_API_KEY_1" in os.environ.keys()
-#    assert "OPENAI_API_KEY_2" in os.environ.keys()
-#    assert "AZUREOPENAI_API_KEY" in os.environ.keys()
+assert os.environ["OPENAI_API_KEY"] is not None
+assert os.environ["OPENAI_API_KEY_1"] is not None
+assert os.environ["OPENAI_API_KEY_2"] is not None
 
 
 # 最もシンプルな生成のテスト
+# @pytest.mark.skip(reason="このテストは現在スキップされています")
 @pytest.mark.parametrize("model", ["gpt-4", "gpt-3.5-turbo", "gpt-4-1106-preview"])
 @pytest.mark.parametrize("temperature", [0.0, 0.00001])
 @pytest.mark.parametrize("mode", ["run", "stream", "stream_async", "run_async"])
@@ -51,6 +49,64 @@ def test_run(model, temperature, mode):
     assert film_core_instance.token_usages["prompt_tokens"] > 0
     assert film_core_instance.token_usages["completion_tokens"] > 0
     assert film_core_instance.token_usages["total_tokens"] > 0
+
+
+# tokenカウントをテスト
+# @pytest.mark.skip(reason="このテストは現在スキップされています")
+@pytest.mark.parametrize(
+    "model",
+    [
+        "gpt-3.5-turbo-0301",
+        "gpt-3.5-turbo-0613",
+        "gpt-3.5-turbo",
+        "gpt-4-0314",
+        "gpt-4-0613",
+        "gpt-4",
+    ],
+)
+def test_token_count(model):
+    messages = []
+    system_prompt = "あなたはSmart Assistantです。名前は「アイ」です。"
+    messages.append({"role": "assistant", "content": "私はアイと言います。楽しく会話しましょう。"})
+    messages.append({"role": "user", "content": "分かりました。私は田中です。あなたのフルネームを教えてください。"})
+    messages.append({"role": "assistant", "content": "私の名前はアイです。私はあなたのAIアシスタントです。"})
+    dummy_prompt = "Just answer 'I'm AI. Nice to meet you.'"
+    # リファレンス用の文字列生成
+    chat_completion = OpenAI().chat.completions.create(
+        messages=messages
+        + [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": dummy_prompt},
+        ],
+        model=model,
+        temperature=0.0,
+        max_tokens=1,  # we're only counting input tokens here, so let's not waste tokens on the output
+    )
+
+    prompt_tokens = chat_completion.usage.prompt_tokens
+    total_tokens = chat_completion.usage.total_tokens
+
+    # FilmCore クラスのインスタンスを生成
+    film_core_instance = FilmCore(
+        prompt=dummy_prompt,
+        history=messages,
+        system_prompt=system_prompt,
+        config=FilmConfig(model=model, temperature=0.0, max_tokens=1),
+    )
+
+    # placeholdersを用いてrunメソッドを呼び出す
+    film_core_instance.run()
+
+    # 結果が期待通りであることをアサートする
+    def compare(v1, v2, threshold=0.1):
+        return abs(v1 - v2) / max(v1, v2) <= threshold
+
+    assert compare(
+        film_core_instance.token_usages["prompt_tokens"], prompt_tokens, threshold=0.05
+    )
+    assert compare(
+        film_core_instance.token_usages["total_tokens"], total_tokens, threshold=0.05
+    )
 
 
 # ラウンドロビンをテスト

@@ -2,26 +2,25 @@ import pytest
 from unittest.mock import patch, Mock
 from spiralfilm.core import FilmCore
 from spiralfilm.config import FilmConfig
+from openai import OpenAI
 
-
-# _placeholder メソッドのテスト
-def test_placeholder(mock_openai_api):
-    # プロンプトに含まれるプレースホルダーを置き換え
-    prompt = "{{variable1}} is {{variable2}}. And {{variable3}} is {{variable4}}."
-    placeholders = {
-        "variable1": "summer",
-        "variable2": "hot",
-        "variable3": "winter",
-        "variable4": "cold",
-    }
-    expected_prompt = "summer is hot. And winter is cold."
-
-    fc = FilmCore(prompt)
-
-    # 正常系の確認
-    assert fc._placeholder(prompt, placeholders) == expected_prompt
-
-    # 異常系の確認
-    placeholders = {"variable1": "summer", "variable2": "hot"}
-    # with pytest.raises(KeyError):
-    fc._placeholder(prompt, placeholders)
+chat_completion = OpenAI().chat.completions.create(
+    messages=[
+        {
+            "role": "system",
+            "content": "あなたは賢いAIアシスタントです。名前は、「アイ」です。",
+        },
+        {
+            "role": "assistant",
+            "content": "楽しく会話しましょう。",
+        },
+        {
+            "role": "user",
+            "content": """分かりました。あなたの名前を教えてください。出力は、以下のフォーマットでお願いします。
+            「こんにちは。私の名前は(AIの名前)と言います。皆さんにお会いできて嬉しいです。これから、様々なことを教えて下さいね。」
+            """,
+        },
+    ],
+    model="gpt-4",
+)
+print(chat_completion.usage)
