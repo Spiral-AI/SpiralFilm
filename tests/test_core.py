@@ -9,10 +9,12 @@ from openai import OpenAI
 assert os.environ["OPENAI_API_KEY"] is not None
 assert os.environ["OPENAI_API_KEY_1"] is not None
 assert os.environ["OPENAI_API_KEY_2"] is not None
+assert os.environ["AZUREOPENAI_API_KEY"] is not None
+assert os.environ["AZUREOPENAI_ENDPOINT"] is not None
 
 
 # 最もシンプルな生成のテスト
-# @pytest.mark.skip(reason="このテストは現在スキップされています")
+@pytest.mark.skip(reason="このテストは現在スキップされています")
 @pytest.mark.parametrize("model", ["gpt-4", "gpt-3.5-turbo", "gpt-4-1106-preview"])
 @pytest.mark.parametrize("temperature", [0.0, 0.00001])
 @pytest.mark.parametrize("mode", ["run", "stream", "stream_async", "run_async"])
@@ -50,9 +52,32 @@ def test_run(model, temperature, mode):
     assert film_core_instance.token_usages["completion_tokens"] > 0
     assert film_core_instance.token_usages["total_tokens"] > 0
 
+# Azureのテスト
+def test_azure():
+    # FilmCore クラスのインスタンスを生成
+    film_core_instance = FilmCore(
+        prompt="""Hi {{name}}. Just answer 'Yes.'""",
+        config=FilmConfig(model="gpt-3.5-turbo", 
+                          temperature=0.0, 
+                          max_tokens=3, 
+                          api_type="azure",
+                          azure_deployment_id="gpt-35-turbo",
+                          azure_api_version="2023-05-15",),
+    )
+    film_core_instance.config.add_key(os.environ["AZUREOPENAI_API_KEY"], api_base=os.environ["AZUREOPENAI_ENDPOINT"])
+
+    # placeholdersを用いてrunメソッドを呼び出す
+    result = film_core_instance.run({"name": "Tom"})
+
+    # 結果が期待通りであることをアサートする
+    assert result == "Yes."
+    assert film_core_instance.finish_reason == "stop"
+    assert film_core_instance.token_usages["prompt_tokens"] > 0
+    assert film_core_instance.token_usages["completion_tokens"] > 0
+    assert film_core_instance.token_usages["total_tokens"] > 0
 
 # tokenカウントをテスト
-# @pytest.mark.skip(reason="このテストは現在スキップされています")
+@pytest.mark.skip(reason="このテストは現在スキップされています")
 @pytest.mark.parametrize(
     "model",
     [

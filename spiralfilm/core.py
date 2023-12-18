@@ -18,7 +18,6 @@ import time
 import logging
 import openai
 import tiktoken
-import tqdm
 import re
 import os
 import pickle
@@ -170,14 +169,19 @@ class FilmCore:
                 # キャッシュなしの呼び出しパターン
                 if cache_result is None:
                     apikey, time_to_wait = self.config.get_apikey()
+                    for _ in range(10):
+                        print(self.config.to_dict(override_params=self.override_params))
                     # TODO: Azureとの連携機能を追加
                     # TODO: Retryについて設定を追加
-                    client = openai.AsyncOpenAI(api_key=apikey["api_key"])
-
+                    if self.config.api_type == "openai":
+                        client = openai.AsyncOpenAI(api_key=apikey["api_key"])
+                    elif self.config.api_type == "azure":
+                        client = openai.AsyncAzure(api_key=apikey["api_key"], 
+                                                   api_version=self.config.azure_api_version, 
+                                                   api_base=apikey["api_base"],)
                     if time_to_wait > 0:
                         logger.warning(f"Waiting for {time_to_wait}s...")
                         time.sleep(time_to_wait)
-
                     chunk_gen = await client.chat.completions.create(
                         messages=messages,
                         **self.config.to_dict(override_params=self.override_params),
@@ -291,19 +295,6 @@ class FilmCore:
         loop = asyncio.get_event_loop()
         result = loop.run_until_complete(self.run_async(placeholders))
         return result
-
-    def _set_api(self, apikey):
-        if self.config.api_type == "openai":
-            openai.api_type = "open_ai"
-            openai.api_key = apikey["api_key"]
-            openai.api_base = "https://api.openai.com/v1"
-            openai.api_version = None
-        elif self.config.api_type == "azure":
-            openai.api_type = "azure"
-            openai.api_key = apikey["api_key"]
-            openai.api_base = apikey["api_base"]
-            openai.api_version = self.config.azure_api_version
-        return
 
     def read_cache(self, messages, config, override_params):
         with self.cache_lock:  # Acquire lock when accessing cache

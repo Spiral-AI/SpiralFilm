@@ -1,4 +1,5 @@
 from spiralfilm import FilmCore, FilmConfig
+import os
 
 # Basic concept of how to distribute the params:
 # FilmConfig(...): Params which may impact the output quality.
@@ -12,11 +13,10 @@ config = FilmConfig(
 )
 
 # You can set your api key here.
-# also you can set them as environment variables: AZURE_API_KEY, AZURE_API_BASE
-# config.add_key(
-#    "PUT-YOUR-KEY-HERE",  # Azure portal provides two keys. Take one of them.
-#    api_base="https://PUT-YOUR-BASE-URL-HERE.openai.azure.com/",  # Azure portal provides this.
-# )
+config.add_key(
+    os.environ["AZURE_API_KEY"],  # Azure portal provides two keys. Take one of them.
+    api_base=os.environ["AZURE_API_BASE"],  # Azure portal provides this.
+)
 
 f = FilmCore(
     prompt="""
