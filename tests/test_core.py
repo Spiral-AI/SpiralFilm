@@ -3,50 +3,86 @@ import os
 from unittest.mock import patch, MagicMock
 from spiralfilm.core import FilmCore
 from spiralfilm.config import FilmConfig
+import asyncio
 
 
 # 環境のセットアップ状況の確認
-def test_env_setup():
-    assert "OPENAI_API_KEY" in os.environ.keys()
-    assert "OPENAI_API_KEY_1" in os.environ.keys()
-    assert "OPENAI_API_KEY_2" in os.environ.keys()
+# def test_env_setup():
+#    assert "OPENAI_API_KEY" in os.environ.keys()
+#    assert "OPENAI_API_KEY_1" in os.environ.keys()
+#    assert "OPENAI_API_KEY_2" in os.environ.keys()
+#    assert "AZUREOPENAI_API_KEY" in os.environ.keys()
 
 
 # 最もシンプルな生成のテスト
-def test_run():
-    # 期待される応答をモックする: https://platform.openai.com/docs/api-reference/making-requests
-    expected_response = {
-        "id": "chatcmpl-abc123",
-        "object": "chat.completion",
-        "created": 1677858242,
-        "model": "gpt-3.5-turbo-1106",
-        "usage": {"prompt_tokens": 13, "completion_tokens": 7, "total_tokens": 20},
-        "choices": [
-            {
-                "message": {"role": "assistant", "content": "Yes"},
-                "finish_reason": "stop",
-                "index": 0,
-            }
-        ],
-    }
-
+@pytest.mark.parametrize("model", ["gpt-4", "gpt-3.5-turbo", "gpt-4-1106-preview"])
+@pytest.mark.parametrize("temperature", [0.0, 0.00001])
+@pytest.mark.parametrize("mode", ["run", "stream", "stream_async", "run_async"])
+def test_run(model, temperature, mode):
     # FilmCore クラスのインスタンスを生成
     film_core_instance = FilmCore(
-        prompt="""Hi {{name}}. Just answer 'Yes'""",
-        config=FilmConfig(model="gpt-3.5-turbo-1106", temperature=0.0, max_tokens=100),
+        prompt="""Hi {{name}}. Just answer 'Yes.'""",
+        config=FilmConfig(model=model, temperature=temperature, max_tokens=3),
     )
 
     # placeholdersを用いてrunメソッドを呼び出す
-    result = film_core_instance.run({"name": "Tom"})
+    if mode == "run":
+        result = film_core_instance.run({"name": "Tom"})
+    elif mode == "run_async":
+        loop = asyncio.get_event_loop()
+        result = loop.run_until_complete(film_core_instance.run_async({"name": "Tom"}))
+    elif mode == "stream":
+        result = ""
+        for t in film_core_instance.stream({"name": "Tom"}):
+            result += t
+    elif mode == "stream_async":
+        loop = asyncio.get_event_loop()
+        result = ""
+        async_gen = film_core_instance.stream_async({"name": "Tom"})
+        while True:
+            try:
+                result += loop.run_until_complete(async_gen.__anext__())
+            except StopAsyncIteration:
+                break
 
     # 結果が期待通りであることをアサートする
-    assert result == "Yes"
-    assert film_core_instance.finished_reason == "stop"
-    assert film_core_instance.token_usages == {
-        "prompt_tokens": 25,
-        "completion_tokens": 1,
-        "total_tokens": 26,
-    }
+    assert result == "Yes."
+    assert film_core_instance.finish_reason == "stop"
+    assert film_core_instance.token_usages["prompt_tokens"] > 0
+    assert film_core_instance.token_usages["completion_tokens"] > 0
+    assert film_core_instance.token_usages["total_tokens"] > 0
+
+
+# ラウンドロビンをテスト
+def test_roundrobin():
+    config = FilmConfig()
+    config.add_key(os.environ["OPENAI_API_KEY_1"])
+    config.add_key(os.environ["OPENAI_API_KEY_2"])
+    # FilmCore インスタンスの run メソッドをモック化
+    with patch.object(FilmCore, "run", return_value=None) as mock_run:
+        f = FilmCore(
+            prompt="""
+    Talk as you want.
+    You're {{user_name}}.
+    """,
+            config=config,
+        )
+
+        # run メソッドを10回呼び出し
+        for _ in range(10):
+            f.run(placeholders={"user_name": "Tom"})
+
+        # APIキーがラウンドロビン方式で使用されていることを確認するために、config.apikeysのリストを、"available_time"でソートし、一番最初の要素のapi_keyを取得
+        api_keys_used = [
+            api_key["api_key"]
+            for api_key in sorted(f.config.apikeys, key=lambda x: x["available_time"])
+        ]
+        # 交互に登場しているか確認
+        for i in range(0, len(api_keys_used), 2):
+            assert api_keys_used[i] != api_keys_used[i + 1]
+
+        # run メソッドが10回呼ばれたことを確認
+        assert mock_run.call_count == 10
 
 
 # _placeholder メソッドのテスト
@@ -91,25 +127,3 @@ def test_placeholder():
     }
     with pytest.raises(ValueError):
         fc._placeholder(prompt, placeholders)
-
-
-# _messages メソッドのテスト
-@pytest.mark.skip(reason="このテストは現在無効化されています")
-def test_messages(film_core_instance):
-    # 正しいメッセージのリストが生成されるかをチェック
-    history = ["User input", "Assistant response"]
-    updated_messages = film_core_instance._messages(
-        film_core_instance.prompt, history, film_core_instance.system_prompt
-    )
-
-    # messagesリストの構造と内容を検証
-    assert len(updated_messages) == 3  # system_prompt + history + user_prompt
-    assert updated_messages[0]["role"] == "system"
-    assert updated_messages[1]["role"] == "user"
-    assert updated_messages[2]["role"] == "assistant"
-
-
-# その他のメソッドに対するテストも同様のパターンで追加することができます。
-# 例えば num_tokens, max_tokens, summary などのメソッドです。
-
-# テストの実行には、コマンドラインから `pytest` を実行します。

@@ -25,6 +25,8 @@ import pickle
 import hashlib
 import asyncio
 from threading import Lock
+import threading
+import queue
 from .config import FilmConfig
 from .errors import *
 
@@ -69,7 +71,7 @@ class FilmCore:
         self.result = None
         self.result_messages = None
         self.result_content = ""
-        self.finished_reason = None
+        self.finish_reason = None
         self.token_usages = None
         self.cache_lock = Lock()  # Create a lock for cache
         self.override_params = override_params
@@ -120,186 +122,170 @@ class FilmCore:
 
         return new_instance
 
-    def run(self, placeholders={}):
-        """Run the API with the given placeholders and config.
-        Args:
-            placeholders (dict): A dictionary of placeholders and their values.
-        Returns:
-            The result of the API call.
-
-        Usage:
-            fc = FilmCore(prompt, config=myconfig).run(
-                    {"variable1":"summer", "variable2":"hot"}
-                )
-
-        Reference for the returnd results from OpenAI ChatCompletion, which will be stored in self.result
-        {
-            "choices": [
-                {
-                "finish_reason": "stop",
-                "index": 0,
-                "message": {
-                    "content": "The 2020 World Series was played in Texas at Globe Life Field in Arlington.",
-                    "role": "assistant"
-                }
-                }
-            ],
-            "created": 1677664795,
-            "id": "chatcmpl-7QyqpwdfhqwajicIEznoc6Q47XAyW",
-            "model": "gpt-3.5-turbo-0613",
-            "object": "chat.completion",
-            "usage": {
-                "completion_tokens": 17,
-                "prompt_tokens": 57,
-                "total_tokens": 74
-            }
-        }
+    async def stream_async(self, placeholders={}):
         """
-        prompt = self._placeholder(self.prompt, placeholders)
-        messages = self._messages(prompt, self.history, self.system_prompt)
-        self.result_prompt = prompt
-        self.result_messages = messages
-
-        start_time = time.time()
-
-        # check Cache
-        is_cache_hit = False
-        if self.config.use_cache:
-            with self.cache_lock:  # Acquire lock when accessing cache
-                message_hash = hashlib.md5(
-                    (
-                        str(messages)
-                        + str(
-                            self.config.to_dict(
-                                mode="Caching",
-                                override_params=self.override_params,
-                            )
-                        )
-                    ).encode()
-                ).hexdigest()
-                if message_hash in self.cache:
-                    logger.info("Cache hit.")
-                    raw_result = self.cache[message_hash]
-                    is_cache_hit = True
-
-        # call API if cache is not hit
-        if is_cache_hit == False:
-            raw_result = self._call_with_retry(messages, config=self.config)
-
-            if self.config.use_cache:
-                with self.cache_lock:  # Acquire lock when updating cache
-                    # message_hash is already calcuated
-                    self.cache[message_hash] = raw_result
-                    with open(self.config.cache_path, "wb") as f:
-                        pickle.dump(self.cache, f)
-
-        end_time = time.time()
-
-        # Parse the result
-        result_content = raw_result["choices"][0]["message"]["content"]
-        self.result = raw_result
-        self.result_content = result_content
-        self.finished_reason = raw_result["choices"][0]["finish_reason"]
-        self.token_usages = raw_result["usage"]
-
-        # Check stopwords (OpenAI sometimes returns setences that contain stopwords)
-        if self.config.stop is not None:
-            for stopword in self.config.stop:
-                if result_content.startswith(stopword):
-                    result_content = ""
-
-        logger.info(
-            f"Prompt: {self.prompt}\n\n"
-            + f"Result: {raw_result}\n\n"
-            + f"Time taken: {end_time - start_time} sec."
-        )
-
-        return result_content  # don't return self.result_content, which may be changed by the other threads
-
-    def stream(self, placeholders={}):
-        """
+        asyncかつ、streaming形式でAPIを呼び出す。
+        これが最も中核となる関数であり、run()などはこれをラップして実装されている。
         Args:
             messages (list): A list of messages to be sent to the API.
             config (FilmConfig): A FilmConfig object.
         Returns:
             The result of the API call.
         """
+        # 必要なデータの準備
         prompt = self._placeholder(self.prompt, placeholders)
         messages = self._messages(prompt, self.history, self.system_prompt)
+
+        # 結果を格納する変数の初期化
         self.result_prompt = prompt
         self.result_messages = messages
 
-        stream_object = openai.ChatCompletion.create(
-            messages=messages,
-            **self.config.to_dict(override_params=self.override_params),
-            stream=True,
+        # キャッシュの確認
+        t0 = time.time()
+        if self.config.use_cache:
+            cache_result, message_hash = await self.read_cache(
+                messages, config=self.config, override_params=self.override_params
+            )
+        else:
+            cache_result, message_hash = None, None
+        t1 = time.time()
+        if (t1 - t0) > 1.0:
+            logger.warning(
+                f"cache checking time = {t1-t0} sec is too long."
+                + f"Consider deleting cache file ({self.config.cache_path})"
+            )
+
+        # tokenだけ、仮にretryされた場合には累積で計算する (そうでないと、コストが間違う)
+        self.token_usages = {
+            "prompt_tokens": self.num_tokens(messages),
+            "completion_tokens": 0,
+            "total_tokens": 0,
+        }
+
+        # OpenAIの呼び出し (リトライ付き)
+        for _ in range(self.config.max_retries):
+            self.result = []  # すべてのAPI呼び出しの結果を保存する
+            self.result_content = ""
+            self.finish_reason = None
+            try:
+                # キャッシュなしの呼び出しパターン
+                if cache_result is None:
+                    apikey, time_to_wait = self.config.get_apikey()
+                    # TODO: Azureとの連携機能を追加
+                    # TODO: Retryについて設定を追加
+                    client = openai.AsyncOpenAI(api_key=apikey["api_key"])
+
+                    if time_to_wait > 0:
+                        logger.warning(f"Waiting for {time_to_wait}s...")
+                        time.sleep(time_to_wait)
+
+                    chunk_gen = await client.chat.completions.create(
+                        messages=messages,
+                        **self.config.to_dict(override_params=self.override_params),
+                        stream=True,
+                    )
+                # キャッシュありの呼び出しパターン
+                else:
+                    chunk_gen = cache_result
+
+                # generatorをループで回す
+                async for chunk in chunk_gen:
+                    self.token_usages["completion_tokens"] += 1  # インクリメント
+                    delta = chunk.choices[0].delta.content
+                    # 最新の値を設定する
+                    self.finish_reason = chunk.choices[0].finish_reason
+                    # すべての出力を保存する
+                    self.result.append(chunk)
+
+                    # content filterの場合はStream途中でもすぐにエラーを投げる
+                    if self.finish_reason == "content_filter":
+                        self.config.update_apikey(apikey, status="success")
+                        raise ContentFilterError(
+                            f"Response has a finish reason of 'content_filter'\n{messages}"
+                        )
+
+                    self.result_content += delta if delta is not None else ""
+                    # Stop wordsのチェック。存在したらループを抜ける
+                    is_stop = False
+                    if self.config.stop is not None:
+                        for stopword in self.config.stop:
+                            if self.result_content.startswith(stopword):
+                                is_stop = True
+                                break
+                    if is_stop:
+                        break
+                    # 文字をyieldする。
+                    if delta is not None:
+                        yield delta
+                else:
+                    self.config.update_apikey(apikey, status="success")
+                    break
+            except (
+                openai.RateLimitError,
+                openai.InternalServerError,
+                openai.APIConnectionError,
+            ) as err:
+                self.config.update_apikey(apikey, status="failure")
+                logger.warning(f"Retryable Error: {err}")
+            except ContentFilterError as cfe:
+                logger.error(f"Error due to content filter: {cfe}")
+                raise
+            except Exception as err:
+                logger.error(f"Error: {err}")
+                raise
+        else:
+            raise MaxRetriesExceededError("Max retries exceeded.")
+
+        # キャッシュの保存
+        if self.config.use_cache and cache_result is None and self.result:
+            self.save_cache(message_hash, self.result)
+
+        # トークン数の計算
+        self.token_usages["total_tokens"] = (
+            self.token_usages["prompt_tokens"] + self.token_usages["completion_tokens"]
         )
 
-        result_content = ""
-
-        for result in stream_object:
-            if "content" in result["choices"][0]["delta"]:
-                newtoken = result["choices"][0]["delta"]["content"]
-                self.finished_reason = result["choices"][0]["finish_reason"]
-                result_content += newtoken
-                is_stop = False
-                if self.config.stop is not None:
-                    for stopword in self.config.stop:
-                        if result_content.startswith(stopword):
-                            is_stop = True
-                            break
-                if is_stop:
-                    break
-                yield newtoken
-            else:
-                self.result_content = result_content
-                return result_content  # don't return self.result_content, which may be changed by the other threads
-
     async def run_async(self, placeholders={}):
-        loop = asyncio.get_event_loop()
-        result = await loop.run_in_executor(None, self.run, placeholders)
+        """
+        stream_async()の非stream版。
+        """
+        result = ""
+        async for t in self.stream_async(placeholders):
+            result += t
         return result
 
-    def run_parallel(self, placeholders_list=[]):
-        async def _run_with_semaphore(placeholders, progress, semaphore):
-            async with semaphore:
-                result = await self.run_async(placeholders)
-                progress.update(1)  # タスクが完了したらプログレスバーを更新
-                return result
+    def stream(self, placeholders={}):
+        """
+        stream_async()の同期版。
+        """
+        q = queue.Queue()
 
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            loop.close()
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
+        def producer():
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
 
-        semaphore = asyncio.Semaphore(self.config.max_queues)
-        with tqdm.tqdm(total=len(placeholders_list), desc="Processing") as progress:
-            tasks = [
-                _run_with_semaphore(placeholders, progress, semaphore)
-                for placeholders in placeholders_list
-            ]
-            results = loop.run_until_complete(asyncio.gather(*tasks))
+            async def produce():
+                async for chunk in self.stream_async(placeholders):
+                    q.put(chunk)
+                q.put(None)  # ストリームの終了を示す
 
-        loop.close()
-        return results
+            loop.run_until_complete(produce())
 
-    async def stream_async(self, placeholders={}):
-        # Create generator
-        generator = self.stream(placeholders)
+        threading.Thread(target=producer).start()
 
         while True:
-            try:
-                # Run the `next` function to get the next item from the generator
-                result = await asyncio.to_thread(lambda: next(generator, None))
-                if result is None:
-                    break
-                else:
-                    yield result
-            except Exception as e:
-                # print(f"An error occurred: {e}")
-                logger.error(f"An error occurred: {e}")
+            chunk = q.get()
+            if chunk is None:
                 break
+            yield chunk
+
+    def run(self, placeholders={}):
+        """
+        run_async()の同期版。
+        """
+        loop = asyncio.get_event_loop()
+        result = loop.run_until_complete(self.run_async(placeholders))
+        return result
 
     def _set_api(self, apikey):
         if self.config.api_type == "openai":
@@ -314,59 +300,31 @@ class FilmCore:
             openai.api_version = self.config.azure_api_version
         return
 
-    def _call_with_retry(self, messages, config):
-        """
-        Error handling and automatic retry.
-        See details:
-        https://help.openai.com/en/articles/6897213-openai-library-error-types-guidance
-        https://github.com/openai/openai-python/blob/main/openai/api_resources/chat_completion.py
-
-        Args:
-            messages (list): A list of messages to be sent to the API.
-            config (FilmConfig): A FilmConfig object.
-        Returns:
-            The result of the API call.
-        """
-
-        for i in range(self.config.max_retries):
-            apikey, time_to_wait = self.config.get_apikey()
-            self._set_api(apikey)
-
-            if time_to_wait > 0:
-                logger.warning(f"Waiting for {time_to_wait}s...")
-                time.sleep(time_to_wait)
-
-            try:
-                result = openai.ChatCompletion.create(
-                    messages=messages,
-                    **config.to_dict(override_params=self.override_params),
-                )
-                # Check the finished reason
-                if result["choices"][0]["finish_reason"] == "content_filter":
-                    self.config.update_apikey(
-                        apikey, status="success"
-                    )  # API itself works fine. No need to avoid next time.
-                    raise ContentFilterError(
-                        f"Response has a finish reason of 'content_filter'\n{messages}"
+    def read_cache(self, messages, config, override_params):
+        with self.cache_lock:  # Acquire lock when accessing cache
+            message_hash = hashlib.md5(
+                (
+                    str(messages)
+                    + str(
+                        self.config.to_dict(
+                            mode="Caching",
+                            override_params=self.override_params,
+                        )
                     )
-                else:
-                    self.config.update_apikey(apikey, status="success")
-                    return result
-            except (
-                openai.error.RateLimitError,
-                openai.error.Timeout,
-                openai.error.APIError,
-                openai.error.APIConnectionError,
-            ) as err:
-                self.config.update_apikey(apikey, status="failure")
-                logger.warning(f"Retryable Error: {err}")
-            except ContentFilterError as cfe:
-                logger.error(f"Error due to content filter: {cfe}")
-                raise
-            except Exception as err:
-                logger.error(f"Error: {err}")
-                raise
-        raise MaxRetriesExceededError("Max retries exceeded.")
+                ).encode()
+            ).hexdigest()
+            if message_hash in self.cache:
+                logger.info("Cache hit.")
+                raw_result = self.cache[message_hash]
+                return raw_result, message_hash
+            else:
+                return None, None
+
+    def save_cache(self, message_hash, api_result):
+        with self.cache_lock:
+            self.cache[message_hash] = api_result
+            with open(self.config.cache_path, "wb") as f:
+                pickle.dump(self.cache, f)
 
     def _placeholder(self, prompt, placeholders):
         """
@@ -439,10 +397,10 @@ class FilmCore:
 
         return messages
 
-    def num_tokens(self, placeholders={}):
+    def num_tokens(self, messages):
         """Returns the number of tokens used by a list of messages.
         Args:
-            placeholders (dict): A dictionary of placeholders and their values.
+            messages (list): A list of messages to be sent to the API.
         Returns:
             The number of tokens used by the messages.
         """
@@ -451,14 +409,10 @@ class FilmCore:
         except KeyError:
             encoding = tiktoken.get_encoding("cl100k_base")
 
-        prompt = self._placeholder(self.prompt, placeholders)
-        messages = self._messages(prompt, self.history, self.system_prompt)
-
         num_tokens = 0
         for message in messages:
-            num_tokens += (
-                4  # every message follows <im_start>{role/name}\n{content}<im_end>\n
-            )
+            # every message follows <im_start>{role/name}\n{content}<im_end>\n
+            num_tokens += 4
             for key, value in message.items():
                 num_tokens += len(encoding.encode(value))
                 if key == "name":  # if there's a name, the role is omitted
