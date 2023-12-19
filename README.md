@@ -71,39 +71,8 @@ You're {{user_name}}.
 print(f)
 ```
 
-### Example 2: Parallel Processing Magic 🪄
-Sometimes you might need to generate content for multiple prompts in parallel. Doing them one by one can be time-consuming, especially when dealing with a large number. This is where the run_parallel method shines, making the most out of the available computational power.
 
-For this, we'll use the script in `examples/parallel_example.py`:
-```python
-from spiralfilm import FilmCore, FilmConfig
-
-# Configuration setup: Here, we're specifying that up to 10 tasks can be run concurrently.
-config = FilmConfig(max_queues=10)
-
-# Preparing our placeholders list
-placeholders_list = []
-for i in range(20):  # Creating 20 placeholders
-    placeholders_list.append({"number": str(i)})
-
-# Now, let's create a FilmCore instance with our specified configuration
-f = FilmCore(
-    prompt="""
-Your lucky number is {{number}}.
-""",
-    config=config,
-)
-
-# Using the run_parallel method, all the prompts will be processed concurrently
-results = f.run_parallel(placeholders_list=placeholders_list)
-
-# Displaying the results
-print(results)
-print(f"Processed {len(results)} prompts in parallel!")
-```
-In this example, the run_parallel method allows for concurrent processing of multiple prompts, drastically reducing the time it would take if done sequentially. This is especially handy for batch processing or when dealing with real-time requirements.
-
-### Example 3: Recollections and Context Memory 🧠
+### Example 2: Recollections and Context Memory 🧠
 There's immense power in context, and with `FilmCore`, you can harness this power seamlessly. This example, which you can find in `examples/conversation_example.py`, showcases how you can retain context and query it in subsequent interactions:
 
 
@@ -131,7 +100,7 @@ print(fc2.run())
 ```
 
 
-### Example 4: Deep Dive with Embeddings 🌊
+### Example 3: Deep Dive with Embeddings 🌊
 If you're keen on exploring semantic relationships between sentences, the `FilmEmbed` utility is your new best friend. Dive into the embedding space and uncover hidden dimensions of meaning. Let's see it in action in the `examples/embed_example.py` script:
 ```python
 from spiralfilm import FilmEmbed
