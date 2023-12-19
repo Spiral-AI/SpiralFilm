@@ -1,8 +1,8 @@
 from spiralfilm import FilmCore, FilmConfig
 
 config = FilmConfig()
-config.add_key("sk-AddYourKeyHere")
-config.add_key("sk-AddAnotherKeyHere")
+config.add_key("YOUR_API_KEY1")
+config.add_key("YOUR_API_KEY2")
 
 f = FilmCore(
     prompt="""

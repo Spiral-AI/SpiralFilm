@@ -10,7 +10,7 @@ async def do_something_else():
 
 
 async def main():
-    _prompt = "Talk freely about movie."
+    _prompt = "Tell me a story in 120 words."
     stream = FilmCore(_prompt)
 
     task1 = asyncio.create_task(stream.run_async())
@@ -20,6 +20,8 @@ async def main():
 
     # print the result from run_async
     print(f"Result from run_async: {results[0]}")
+
+    print(stream.finish_reason)
 
 
 if __name__ == "__main__":

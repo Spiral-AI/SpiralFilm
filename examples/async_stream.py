@@ -45,6 +45,9 @@ async def main():
 
     await asyncio.gather(task1, task2)
 
+    print("task1 :", stream1.token_usages)
+    print("task2 :", stream2.token_usages)
+
 
 if __name__ == "__main__":
     try:

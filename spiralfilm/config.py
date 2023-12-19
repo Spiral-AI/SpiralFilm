@@ -216,8 +216,7 @@ class FilmConfig:
 
         # take care of azure
         if self.api_type == "azure":
-            del result["model"]
-            result["deployment_id"] = self.azure_deployment_id
+            result["model"] = self.azure_deployment_id
 
         # override parameters
         for key, value in override_params.items():

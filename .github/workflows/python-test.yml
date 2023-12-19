@@ -1,0 +1,33 @@
+name: Python Test Workflow
+
+on: [pull_request]
+
+env:
+  AZURE_API_KEY: ${{ secrets.AZURE_API_KEY }}
+  AZURE_API_BASE: ${{ secrets.AZURE_API_BASE }}
+  OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY_1 }}
+  OPENAI_API_KEY_1: ${{ secrets.OPENAI_API_KEY_1 }}
+  OPENAI_API_KEY_2: ${{ secrets.OPENAI_API_KEY_2 }}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        python-version: [3.8, 3.9]
+
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest
+          pip install -e .
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+      - name: Run tests
+        run: pytest
