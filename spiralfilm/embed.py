@@ -53,7 +53,7 @@ class FilmEmbed:
                     + f"Consider deleting cache file ({self.config.cache_path})"
                 )
 
-    def run(self, texts):
+    async def run_async(self, texts):
         """Call OpenAI Embedding API to embed the text.
         Args:
             texts (str or list(str)): The text to embed. Accetps a string or a list of strings.
@@ -113,10 +113,46 @@ class FilmEmbed:
                 self.config,
             )
         else:
-            api_results = self._call_with_retry(
-                messages_to_call,
-                config=self.config,
-            )
+            for _ in range(self.config.max_retries):
+                apikey, time_to_wait = self.config.get_apikey()
+                self._set_api(apikey)
+                if self.config.api_type == "openai":
+                    client = openai.AsyncOpenAI(
+                        api_key=apikey["api_key"],
+                        max_retries=2,
+                        timeout=20.0,
+                    )
+                elif self.config.api_type == "azure":
+                    client = openai.AsyncAzureOpenAI(
+                        api_key=apikey["api_key"],
+                        api_version=self.config.azure_api_version,
+                        azure_endpoint=apikey["api_base"],
+                        max_retries=2,
+                        timeout=20.0,
+                    )
+                if time_to_wait > 0:
+                    logger.info(f"Waiting for {time_to_wait}s...")
+                    time.sleep(time_to_wait)
+
+                try:
+                    api_results = await client.embeddings.create(
+                        input=messages_to_call,
+                        **self.config.to_dict(),
+                    )
+                    self.config.update_apikey(apikey, status="success")
+                    break
+                except (
+                    openai.RateLimitError,
+                    openai.InternalServerError,
+                    openai.APIConnectionError,
+                ) as err:
+                    self.config.update_apikey(apikey, status="failure")
+                    logger.warning(f"Retryable Error: {err}")
+                except Exception as err:
+                    logger.error(f"Error: {err}")
+                    raise
+            else:
+                raise MaxRetriesExceededError("Max retries exceeded.")
 
         # Parse the result
         self.results = []
@@ -125,7 +161,7 @@ class FilmEmbed:
             if cached_vec is not None:
                 self.results.append(cached_vec)
             else:
-                api_vec = api_results["data"].pop(0)["embedding"]
+                api_vec = api_results.data.pop(0).embedding
                 self.results.append(api_vec)
                 if self.config.use_cache:
                     message_hash = hash_dict[message]
@@ -150,9 +186,9 @@ class FilmEmbed:
         else:
             return self.results
 
-    async def run_async(self, texts):
+    def run(self, texts):
         loop = asyncio.get_event_loop()
-        result = await loop.run_in_executor(None, self.run, texts)
+        result = loop.run_until_complete(self.run_async(texts))
         return result
 
     def _set_api(self, apikey):
@@ -169,6 +205,7 @@ class FilmEmbed:
         """
         Azure OpenAI API accepts up to 16 messages per request.
         """
+        # TODO:修正
         azure_limit = 16
         # split messages into chunks of 16
         messages_chunks = [

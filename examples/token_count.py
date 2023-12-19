@@ -32,7 +32,6 @@ example_messages = [
 from spiralfilm import FilmCore, FilmConfig
 import openai
 
-f = FilmCore("")
 
 for model in [
     "gpt-3.5-turbo-0301",
@@ -54,5 +53,5 @@ for model in [
     )
 
     tokens1 = response.usage.total_tokens - 1
-    tokens2 = f.num_tokens_from_messages(example_messages, model=model)
+    tokens2 = FilmCore("").num_tokens(example_messages, model=model)
     print(tokens1, tokens2)

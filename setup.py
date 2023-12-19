@@ -16,7 +16,7 @@ setup(
     author_email="y_sasaki@go-spiral.ai",
     description="A thin wrapper for the OpenAI GPT family of APIs",
     packages=find_packages(),
-    install_requires=["openai==0.28", "tiktoken", "tqdm", "pytest"],
+    install_requires=["openai>=1.0", "tiktoken", "tqdm", "pytest"],
     python_requires=">=3.8, <4",
     keywords="openai, gpt, api, wrapper",
     long_description=long_description,

@@ -1,19 +1,3 @@
-# このクラスは、以下の仕様に従って作られます
-# 目的: OpenAI APIの薄いラッパーとして機能する
-# 機能: 以下の機能を提供する
-# - Automatic retry
-# - Placeholder functionality
-# - Confirmation of sent prompts, time measurement features, and logging
-# - Generation of appropriate exceptions
-# 呼び出し方: 以下のように呼び出す
-# from spiral_film import FilmCore, FilmConfig
-# ...
-# prompt = """...{{variable1}} ... {{variable2}}..."""
-# myconfig = FilmConfig(model="gpt-4", temperature=0.9, max_tokens=100)
-# fc = FilmCore(prompt, config=myconfig)
-# result = fc({"variable1":"summer", "variable2":"hot"})
-
-
 import time
 import logging
 import openai
@@ -139,7 +123,7 @@ class FilmCore:
         # キャッシュの確認
         t0 = time.time()
         if self.config.use_cache:
-            cache_result, message_hash = await self.read_cache(
+            cache_result, message_hash = self.read_cache(
                 messages, config=self.config, override_params=self.override_params
             )
         else:
@@ -153,9 +137,7 @@ class FilmCore:
 
         # tokenだけ、仮にretryされた場合には累積で計算する (そうでないと、コストが間違う)
         self.token_usages = {
-            "prompt_tokens": self.num_tokens_from_messages(
-                messages, model=self.config.model
-            ),
+            "prompt_tokens": self.num_tokens(messages, model=self.config.model),
             "completion_tokens": 0,
             "total_tokens": 0,
         }
@@ -165,20 +147,25 @@ class FilmCore:
             self.result = []  # すべてのAPI呼び出しの結果を保存する
             self.result_content = ""
             self.finish_reason = None
+            apikey = None
             try:
                 # キャッシュなしの呼び出しパターン
                 if cache_result is None:
                     apikey, time_to_wait = self.config.get_apikey()
-                    for _ in range(10):
-                        print(self.config.to_dict(override_params=self.override_params))
-                    # TODO: Azureとの連携機能を追加
-                    # TODO: Retryについて設定を追加
                     if self.config.api_type == "openai":
-                        client = openai.AsyncOpenAI(api_key=apikey["api_key"])
+                        client = openai.AsyncOpenAI(
+                            api_key=apikey["api_key"],
+                            max_retries=2,
+                            timeout=20.0,
+                        )
                     elif self.config.api_type == "azure":
-                        client = openai.AsyncAzure(api_key=apikey["api_key"], 
-                                                   api_version=self.config.azure_api_version, 
-                                                   api_base=apikey["api_base"],)
+                        client = openai.AsyncAzureOpenAI(
+                            api_key=apikey["api_key"],
+                            api_version=self.config.azure_api_version,
+                            azure_endpoint=apikey["api_base"],
+                            max_retries=2,
+                            timeout=20.0,
+                        )
                     if time_to_wait > 0:
                         logger.warning(f"Waiting for {time_to_wait}s...")
                         time.sleep(time_to_wait)
@@ -189,8 +176,25 @@ class FilmCore:
                     )
                 # キャッシュありの呼び出しパターン
                 else:
-                    chunk_gen = cache_result
+                    # 非同期ジェネレーターに変換する
+                    class chunk_gen_class:
+                        def __init__(self, cache_result):
+                            self.cache_result = cache_result
+                            self.index = 0
 
+                        async def __anext__(self):
+                            if self.index < len(self.cache_result):
+                                result = self.cache_result[self.index]
+                                self.index += 1
+                                return result
+                            else:
+                                raise StopAsyncIteration
+
+                        def __aiter__(self):
+                            return self
+
+                    # chunk_gen = cache_result
+                    chunk_gen = chunk_gen_class(cache_result)
                 # generatorをループで回す
                 async for chunk in chunk_gen:
                     self.token_usages["completion_tokens"] += 1  # インクリメント
@@ -221,7 +225,8 @@ class FilmCore:
                     if delta is not None:
                         yield delta
                 else:
-                    self.config.update_apikey(apikey, status="success")
+                    if apikey is not None:
+                        self.config.update_apikey(apikey, status="success")
                     break
             except (
                 openai.RateLimitError,
@@ -247,7 +252,7 @@ class FilmCore:
         all_messages = self._messages(
             history=messages + [{"role": "assistant", "content": self.result_content}]
         )
-        self.token_usages["total_tokens"] = self.num_tokens_from_messages(
+        self.token_usages["total_tokens"] = self.num_tokens(
             all_messages, model=self.config.model
         )
         self.token_usages["completion_tokens"] = (
@@ -302,9 +307,9 @@ class FilmCore:
                 (
                     str(messages)
                     + str(
-                        self.config.to_dict(
+                        config.to_dict(
                             mode="Caching",
-                            override_params=self.override_params,
+                            override_params=override_params,
                         )
                     )
                 ).encode()
@@ -314,7 +319,7 @@ class FilmCore:
                 raw_result = self.cache[message_hash]
                 return raw_result, message_hash
             else:
-                return None, None
+                return None, message_hash
 
     def save_cache(self, message_hash, api_result):
         with self.cache_lock:
@@ -398,29 +403,7 @@ class FilmCore:
 
         return messages
 
-    def num_tokens(self, messages):
-        """Returns the number of tokens used by a list of messages.
-        Args:
-            messages (list): A list of messages to be sent to the API.
-        Returns:
-            The number of tokens used by the messages.
-        """
-        try:
-            encoding = tiktoken.encoding_for_model(self.config.model)
-        except KeyError:
-            encoding = tiktoken.get_encoding("cl100k_base")
-
-        num_tokens = 0
-        for message in messages:
-            # every message follows <im_start>{role/name}\n{content}<im_end>\n
-            num_tokens += 4
-            for key, value in message.items():
-                num_tokens += len(encoding.encode(value))
-                if key == "name":  # if there's a name, the role is omitted
-                    num_tokens += -1  # role is always required and always 1 token
-        num_tokens += 2  # every reply is primed with <im_start>assistant
-        return num_tokens
-
+    @staticmethod
     def max_tokens(self):
         """
         Returns the maximum number of tokens allowed by the API.
@@ -484,8 +467,10 @@ class FilmCore:
                 f.write(return_string)
         return return_string
 
-    def num_tokens_from_messages(self, messages, model="gpt-3.5-turbo-0613"):
+    def num_tokens(self, messages, model=None):
         """Return the number of tokens used by a list of messages."""
+        if model is None:
+            model = self.config.model
         try:
             encoding = tiktoken.encoding_for_model(model)
         except KeyError:
@@ -507,15 +492,9 @@ class FilmCore:
             )
             tokens_per_name = -1  # if there's a name, the role is omitted
         elif "gpt-3.5-turbo" in model:
-            print(
-                "Warning: gpt-3.5-turbo may update over time. Returning num tokens assuming gpt-3.5-turbo-0613."
-            )
-            return self.num_tokens_from_messages(messages, model="gpt-3.5-turbo-0613")
+            return self.num_tokens(messages, model="gpt-3.5-turbo-0613")
         elif "gpt-4" in model:
-            print(
-                "Warning: gpt-4 may update over time. Returning num tokens assuming gpt-4-0613."
-            )
-            return self.num_tokens_from_messages(messages, model="gpt-4-0613")
+            return self.num_tokens(messages, model="gpt-4-0613")
         else:
             raise NotImplementedError(
                 f"""num_tokens_from_messages() is not implemented for model {model}. See https://github.com/openai/openai-python/blob/main/chatml.md for information on how messages are converted to tokens."""
