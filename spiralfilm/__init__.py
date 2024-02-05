@@ -8,4 +8,4 @@ from .utils import TextCutter
 from .errors import MaxRetriesExceededError, ContentFilterError
 
 # Specify the version of the package
-__version__ = "0.1.26"
+__version__ = "0.2.4"
