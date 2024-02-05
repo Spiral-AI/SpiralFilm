@@ -94,9 +94,11 @@ class FilmCore:
         new_instance = FilmCore(
             prompt=prompt,
             history=existing_instance.get_history(),
-            system_prompt=system_prompt
-            if system_prompt is not None
-            else existing_instance.system_prompt,
+            system_prompt=(
+                system_prompt
+                if system_prompt is not None
+                else existing_instance.system_prompt
+            ),
             config=existing_instance.config if config is None else config,
         )
 
@@ -300,6 +302,30 @@ class FilmCore:
         loop = asyncio.get_event_loop()
         result = loop.run_until_complete(self.run_async(placeholders))
         return result
+
+    def get_result_info(self) -> str | None:
+        """
+        直近の呼び出しに使ったプロンプトの情報、その返却値、使用したトークンの情報を返す。
+        """
+        if hasattr(self, "result_prompt"):
+            result_prompt = self.result_prompt
+        else:
+            result_prompt = None
+
+        if hasattr(self, "token_usages"):
+            token_usages = self.token_usages
+        else:
+            token_usages = None
+
+        if hasattr(self, "result_messages"):
+            result_messages = self.result_messages
+        else:
+            result_messages = None
+        return {
+            "result_prompt": result_prompt,
+            "token_usages": token_usages,
+            "result_messages": result_messages,
+        }
 
     def read_cache(self, messages, config, override_params):
         with self.cache_lock:  # Acquire lock when accessing cache
