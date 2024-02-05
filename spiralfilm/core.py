@@ -321,10 +321,15 @@ class FilmCore:
             result_messages = self.result_messages
         else:
             result_messages = None
+        if hasattr(self, "result_content"):
+            result_content = self.result_content
+        else:
+            result_content = None
         return {
             "result_prompt": result_prompt,
             "token_usages": token_usages,
             "result_messages": result_messages,
+            "result_content": result_content,
         }
 
     def read_cache(self, messages, config, override_params):
