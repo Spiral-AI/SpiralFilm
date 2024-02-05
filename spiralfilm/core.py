@@ -303,7 +303,7 @@ class FilmCore:
         result = loop.run_until_complete(self.run_async(placeholders))
         return result
 
-    def get_result_info(self) -> str | None:
+    def get_result_info(self) -> dict:
         """
         直近の呼び出しに使ったプロンプトの情報、その返却値、使用したトークンの情報を返す。
         """
