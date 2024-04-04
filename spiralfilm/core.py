@@ -299,8 +299,7 @@ class FilmCore:
         """
         run_async()の同期版。
         """
-        loop = asyncio.get_event_loop()
-        result = loop.run_until_complete(self.run_async(placeholders))
+        result = asyncio.run(self.run_async(placeholders))
         return result
 
     def get_result_info(self) -> dict:
@@ -510,7 +509,7 @@ class FilmCore:
         if model in {
             "gpt-3.5-turbo-0613",
             "gpt-3.5-turbo-16k-0613",
-            "gpt-4-0314",
+            # "gpt-4-0314",
             "gpt-4-32k-0314",
             "gpt-4-0613",
             "gpt-4-32k-0613",

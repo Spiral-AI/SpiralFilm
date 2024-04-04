@@ -2,6 +2,8 @@
 
 import time
 import openai
+from openai import AzureOpenAI
+from openai.types import Embedding
 import tiktoken
 import tqdm
 import logging
@@ -135,10 +137,12 @@ class FilmEmbed:
                     time.sleep(time_to_wait)
 
                 try:
-                    api_results = await client.embeddings.create(
-                        input=messages_to_call,
-                        **self.config.to_dict(),
-                    )
+                    api_results = (
+                        await client.embeddings.create(
+                            input=messages_to_call,
+                            **self.config.to_dict(),
+                        )
+                    ).model_dump()
                     self.config.update_apikey(apikey, status="success")
                     break
                 except (
@@ -150,7 +154,7 @@ class FilmEmbed:
                     logger.warning(f"Retryable Error: {err}")
                 except Exception as err:
                     logger.error(f"Error: {err}")
-                    raise
+                    raise err
             else:
                 raise MaxRetriesExceededError("Max retries exceeded.")
 
@@ -161,7 +165,12 @@ class FilmEmbed:
             if cached_vec is not None:
                 self.results.append(cached_vec)
             else:
-                api_vec = api_results.data.pop(0).embedding
+                if isinstance(em := api_results["data"][0], Embedding):
+                    api_vec = em.embedding
+                else:
+                    api_vec = em["embedding"]
+
+                # api_vec = api_results["data"].pop(0).embedding
                 self.results.append(api_vec)
                 if self.config.use_cache:
                     message_hash = hash_dict[message]
@@ -187,8 +196,7 @@ class FilmEmbed:
             return self.results
 
     def run(self, texts):
-        loop = asyncio.get_event_loop()
-        result = loop.run_until_complete(self.run_async(texts))
+        result = asyncio.run(self.run_async(texts))
         return result
 
     def _set_api(self, apikey):
@@ -215,7 +223,7 @@ class FilmEmbed:
         results = []
         for messages_chunk in tqdm.tqdm(messages_chunks, desc="Azure API call"):
             result = self._call_with_retry(messages_chunk, config)
-            results += result["data"]
+            results += result.data
         return {"data": results}
 
     def _call_with_retry(self, messages, config):
@@ -234,26 +242,35 @@ class FilmEmbed:
         for i in range(self.config.max_retries):
             apikey, time_to_wait = self.config.get_apikey()
             self._set_api(apikey)
+            client = AzureOpenAI(
+                api_version=self.config.azure_api_version,  # getter作る
+                api_key=apikey["api_key"],
+                azure_endpoint=apikey["api_base"],
+            )
 
             if time_to_wait > 0:
                 logger.info(f"Waiting for {time_to_wait}s...")
                 time.sleep(time_to_wait)
 
             try:
-                result = openai.Embedding.create(input=messages, **config.to_dict())
+                result = client.embeddings.create(
+                    input=messages,
+                    model=self.config.model,  # getter
+                    timeout=self.config.timeout,  # getter作る
+                )
                 self.config.update_apikey(apikey, status="success")
                 return result
             except (
-                openai.error.RateLimitError,
-                openai.error.Timeout,
-                openai.error.APIError,
-                openai.error.APIConnectionError,
+                openai.RateLimitError,
+                openai.APITimeoutError,
+                openai.APIError,
+                openai.APIConnectionError,
             ) as err:
                 self.config.update_apikey(apikey, status="failure")
                 logger.warning(f"Retryable Error: {err}")
             except Exception as err:
                 logger.error(f"Error: {err}")
-                raise
+                raise err
         raise MaxRetriesExceededError("Max retries exceeded.")
 
     def num_tokens(self, texts):
