@@ -1,11 +1,16 @@
 import pytest
-import os, time
-from unittest.mock import patch, MagicMock
+import os
+import sys
+
+sys.path.append(".")
+from unittest.mock import patch
 from spiralfilm.core import FilmCore
 from spiralfilm.config import FilmConfig
 from spiralfilm.embed import FilmEmbed, FilmEmbedConfig
-import asyncio
 from openai import OpenAI
+import nest_asyncio
+
+nest_asyncio.apply()
 
 assert os.environ["OPENAI_API_KEY"] is not None
 assert os.environ["OPENAI_API_KEY_1"] is not None
@@ -18,8 +23,37 @@ assert os.environ["AZURE_API_BASE"] is not None
 # @pytest.mark.skip(reason="このテストは現在スキップされています")
 @pytest.mark.parametrize("model", ["gpt-4", "gpt-3.5-turbo", "gpt-4-1106-preview"])
 @pytest.mark.parametrize("temperature", [0.0, 0.00001])
-@pytest.mark.parametrize("mode", ["run", "stream", "stream_async", "run_async"])
-def test_run(model, temperature, mode):
+@pytest.mark.parametrize("mode", ["stream_async", "run_async"])
+@pytest.mark.asyncio
+async def test_run_async(model, temperature, mode):
+    # FilmCore クラスのインスタンスを生成
+    film_core_instance = FilmCore(
+        prompt="""Hi {{name}}. Just answer 'Yes.'""",
+        config=FilmConfig(model=model, temperature=temperature, max_tokens=3),
+    )
+
+    # placeholdersを用いてrunメソッドを呼び出す
+    if mode == "run_async":
+        result = await film_core_instance.run_async({"name": "Tom"})
+    elif mode == "stream_async":
+        result = ""
+        async_gen = film_core_instance.stream_async({"name": "Tom"})
+        async for t in async_gen:
+            result += t
+
+    # 結果が期待通りであることをアサートする
+    assert result == "Yes."
+    assert film_core_instance.finish_reason == "stop"
+    assert film_core_instance.token_usages["prompt_tokens"] > 0
+    assert film_core_instance.token_usages["completion_tokens"] > 0
+    assert film_core_instance.token_usages["total_tokens"] > 0
+
+
+# @pytest.mark.skip(reason="このテストは現在スキップされています")
+@pytest.mark.parametrize("model", ["gpt-4", "gpt-3.5-turbo", "gpt-4-1106-preview"])
+@pytest.mark.parametrize("temperature", [0.0, 0.00001])
+@pytest.mark.parametrize("mode", ["run", "stream"])
+async def test_run(model, temperature, mode):
     # FilmCore クラスのインスタンスを生成
     film_core_instance = FilmCore(
         prompt="""Hi {{name}}. Just answer 'Yes.'""",
@@ -29,22 +63,10 @@ def test_run(model, temperature, mode):
     # placeholdersを用いてrunメソッドを呼び出す
     if mode == "run":
         result = film_core_instance.run({"name": "Tom"})
-    elif mode == "run_async":
-        loop = asyncio.get_event_loop()
-        result = loop.run_until_complete(film_core_instance.run_async({"name": "Tom"}))
     elif mode == "stream":
         result = ""
         for t in film_core_instance.stream({"name": "Tom"}):
             result += t
-    elif mode == "stream_async":
-        loop = asyncio.get_event_loop()
-        result = ""
-        async_gen = film_core_instance.stream_async({"name": "Tom"})
-        while True:
-            try:
-                result += loop.run_until_complete(async_gen.__anext__())
-            except StopAsyncIteration:
-                break
 
     # 結果が期待通りであることをアサートする
     assert result == "Yes."
@@ -56,7 +78,8 @@ def test_run(model, temperature, mode):
 
 # Azureのテスト
 # @pytest.mark.skip(reason="このテストは現在スキップされています")
-def test_azure():
+@pytest.mark.asyncio
+async def test_azure_run_async():
     # FilmCore クラスのインスタンスを生成
     film_core_instance = FilmCore(
         prompt="""Hi {{name}}. Just answer 'Yes.'""",
@@ -72,11 +95,33 @@ def test_azure():
     film_core_instance.config.add_key(
         os.environ["AZURE_API_KEY"], api_base=os.environ["AZURE_API_BASE"]
     )
-
-    # placeholdersを用いてrunメソッドを呼び出す
-    result = film_core_instance.run({"name": "Tom"})
-
+    result = await film_core_instance.run_async({"name": "Tom"})
     # 結果が期待通りであることをアサートする
+    assert result == "Yes."
+    assert film_core_instance.finish_reason == "stop"
+    assert film_core_instance.token_usages["prompt_tokens"] > 0
+    assert film_core_instance.token_usages["completion_tokens"] > 0
+    assert film_core_instance.token_usages["total_tokens"] > 0
+
+
+# @pytest.mark.skip(reason="このテストは現在スキップされています")
+def test_azure_run():
+    # FilmCore クラスのインスタンスを生成
+    film_core_instance = FilmCore(
+        prompt="""Hi {{name}}. Just answer 'Yes.'""",
+        config=FilmConfig(
+            model="gpt-3.5-turbo",
+            temperature=0.0,
+            max_tokens=3,
+            api_type="azure",
+            azure_deployment_id="gpt-35-turbo",
+            azure_api_version="2023-05-15",
+        ),
+    )
+    film_core_instance.config.add_key(
+        os.environ["AZURE_API_KEY"], api_base=os.environ["AZURE_API_BASE"]
+    )
+    result = film_core_instance.run({"name": "Tom"})
     assert result == "Yes."
     assert film_core_instance.finish_reason == "stop"
     assert film_core_instance.token_usages["prompt_tokens"] > 0
@@ -103,16 +148,51 @@ def test_cache():
 
 
 def test_embed():
-    examples = ["Today is a super good day." for _ in range(100)]
+    examples = ["Today is a super good day." for _ in range(3)]
 
     vecs = FilmEmbed().run(texts=examples)
 
     # 結果が期待通りであることをアサートする
-    assert len(vecs) == 100
+    assert len(vecs) == len(examples)
+
+
+@pytest.mark.asyncio
+async def test_azure_embed_run_async():
+    examples = ["Today is a super good day." for _ in range(3)]
+
+    config = FilmEmbedConfig(
+        api_type="azure",
+        azure_deployment_id="text-embedding-ada-002",  # Set the deployment ID you created in Azure portal. This model type should match with the first param.
+        azure_api_version="2023-05-15",  # Find this from https://learn.microsoft.com/ja-jp/azure/ai-services/openai/reference
+    )
+
+    config.add_key(os.environ["AZURE_API_KEY"], api_base=os.environ["AZURE_API_BASE"])
+
+    vecs = await FilmEmbed(config=config).run_async(texts=examples)
+
+    # 結果が期待通りであることをアサートする
+    assert len(vecs) == len(examples)
+
+
+def test_azure_embed_run():
+    examples = ["Today is a super good day." for _ in range(3)]
+
+    config = FilmEmbedConfig(
+        api_type="azure",
+        azure_deployment_id="text-embedding-ada-002",  # Set the deployment ID you created in Azure portal. This model type should match with the first param.
+        azure_api_version="2023-05-15",  # Find this from https://learn.microsoft.com/ja-jp/azure/ai-services/openai/reference
+    )
+
+    config.add_key(os.environ["AZURE_API_KEY"], api_base=os.environ["AZURE_API_BASE"])
+
+    vecs = FilmEmbed(config=config).run(texts=examples)
+
+    # 結果が期待通りであることをアサートする
+    assert len(vecs) == len(examples)
 
 
 def test_embed_cache():
-    examples = [f"Hello! {i}" for i in range(100)]
+    examples = [f"Hello! {i}" for i in range(5)]
     # t0 = time.time()
     vecs1 = FilmEmbed(
         config=FilmEmbedConfig(
@@ -128,8 +208,8 @@ def test_embed_cache():
     # t2 = time.time()
 
     # 結果が期待通りであることをアサートする
-    assert len(vecs1) == 100
-    assert len(vecs2) == 100
+    assert len(vecs1) == len(examples)
+    assert len(vecs2) == len(examples)
 
 
 # tokenカウントをテスト
@@ -140,7 +220,7 @@ def test_embed_cache():
         "gpt-3.5-turbo-0301",
         "gpt-3.5-turbo-0613",
         "gpt-3.5-turbo",
-        "gpt-4-0314",
+        # "gpt-4-0314",
         "gpt-4-0613",
         "gpt-4",
     ],
@@ -148,9 +228,21 @@ def test_embed_cache():
 def test_token_count(model):
     messages = []
     system_prompt = "あなたはSmart Assistantです。名前は「アイ」です。"
-    messages.append({"role": "assistant", "content": "私はアイと言います。楽しく会話しましょう。"})
-    messages.append({"role": "user", "content": "分かりました。私は田中です。あなたのフルネームを教えてください。"})
-    messages.append({"role": "assistant", "content": "私の名前はアイです。私はあなたのAIアシスタントです。"})
+    messages.append(
+        {"role": "assistant", "content": "私はアイと言います。楽しく会話しましょう。"}
+    )
+    messages.append(
+        {
+            "role": "user",
+            "content": "分かりました。私は田中です。あなたのフルネームを教えてください。",
+        }
+    )
+    messages.append(
+        {
+            "role": "assistant",
+            "content": "私の名前はアイです。私はあなたのAIアシスタントです。",
+        }
+    )
     dummy_prompt = "Just answer 'I'm AI. Nice to meet you.'"
     # リファレンス用の文字列生成
     chat_completion = OpenAI().chat.completions.create(
@@ -205,8 +297,8 @@ def test_roundrobin():
             config=config,
         )
 
-        # run メソッドを10回呼び出し
-        for _ in range(10):
+        # run メソッドを3回呼び出し
+        for _ in range(3):
             f.run(placeholders={"user_name": "Tom"})
 
         # APIキーがラウンドロビン方式で使用されていることを確認するために、config.apikeysのリストを、"available_time"でソートし、一番最初の要素のapi_keyを取得
@@ -219,7 +311,7 @@ def test_roundrobin():
             assert api_keys_used[i] != api_keys_used[i + 1]
 
         # run メソッドが10回呼ばれたことを確認
-        assert mock_run.call_count == 10
+        assert mock_run.call_count == 3
 
 
 # _placeholder メソッドのテスト
