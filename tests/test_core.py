@@ -7,17 +7,16 @@ from unittest.mock import patch
 from spiralfilm.core import FilmCore
 from spiralfilm.config import FilmConfig
 from spiralfilm.embed import FilmEmbed, FilmEmbedConfig
-import asyncio
 from openai import OpenAI
+import nest_asyncio
+
+nest_asyncio.apply()
 
 assert os.environ["OPENAI_API_KEY"] is not None
 assert os.environ["OPENAI_API_KEY_1"] is not None
 assert os.environ["OPENAI_API_KEY_2"] is not None
 assert os.environ["AZURE_API_KEY"] is not None
 assert os.environ["AZURE_API_BASE"] is not None
-import nest_asyncio
-
-nest_asyncio.apply()
 
 
 # 最もシンプルな生成のテスト
