@@ -1,3 +1,4 @@
+from __future__ import annotations
 import time
 import logging
 import openai
@@ -22,7 +23,7 @@ class FilmCore:
     def __init__(
         self,
         prompt,
-        history=[],
+        history: list[dict] = [],
         system_prompt=None,
         config=FilmConfig(),
         override_params={},
@@ -40,7 +41,7 @@ class FilmCore:
             "gpt-3.5-turbo"
         ), "Only GPT-4 and GPT-3.5-turbo are supported."
 
-        self.history = history
+        self.history: list[dict] = history
         self.prompt = prompt  # user prompt
         if system_prompt is None:
             self.system_prompt = "You're a helpful assistant."
@@ -74,7 +75,7 @@ class FilmCore:
 
     @staticmethod
     def create_from(
-        existing_instance,
+        existing_instance: FilmCore,
         prompt,
         system_prompt=None,
         config=None,
@@ -117,7 +118,6 @@ class FilmCore:
         # 必要なデータの準備
         prompt = self._placeholder(self.prompt, placeholders)
         messages = self._messages(prompt, self.history, self.system_prompt)
-
         # 結果を格納する変数の初期化
         self.result_prompt = prompt
         self.result_messages = messages
@@ -254,6 +254,8 @@ class FilmCore:
         all_messages = self._messages(
             history=messages + [{"role": "assistant", "content": self.result_content}]
         )
+        self.history.append({"role": "user", "content": prompt})
+        self.history.append({"role": "assistant", "content": self.result_content})
         self.token_usages["total_tokens"] = self.num_tokens(
             all_messages, model=self.config.model
         )
@@ -433,7 +435,6 @@ class FilmCore:
 
         return messages
 
-    @staticmethod
     def max_tokens(self):
         """
         Returns the maximum number of tokens allowed by the API.
@@ -454,7 +455,7 @@ class FilmCore:
         else:
             raise ValueError(f"Unknown model: {self.config.model}")
 
-    def get_history(self):
+    def get_history(self) -> list:
         """
         combine the history, prompts, and results into a single list so that it can be used for the input for the next call.
         Only callable after run() has been called.
@@ -462,11 +463,7 @@ class FilmCore:
         Returns:
             A list of messages to be sent to the API.
         """
-
-        if self.result_messages is None:
-            raise Exception("Please call run() first.")
-
-        return [x["content"] for x in self.result_messages]
+        return self.history
 
     def summary(self, save_path=None):
         """
@@ -497,8 +494,10 @@ class FilmCore:
                 f.write(return_string)
         return return_string
 
-    def num_tokens(self, messages, model=None):
+    def num_tokens(self, messages: list[dict] | dict, model=None):
         """Return the number of tokens used by a list of messages."""
+        if isinstance(messages, dict):
+            messages = [messages]
         if model is None:
             model = self.config.model
         try:
@@ -531,6 +530,7 @@ class FilmCore:
             )
         num_tokens = 0
         for message in messages:
+
             num_tokens += tokens_per_message
             for key, value in message.items():
                 num_tokens += len(encoding.encode(value))
