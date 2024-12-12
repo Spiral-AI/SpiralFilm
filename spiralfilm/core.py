@@ -38,8 +38,8 @@ class FilmCore:
         """
 
         assert config.model.startswith("gpt-4") or config.model.startswith(
-            "gpt-3.5-turbo"
-        ), "Only GPT-4 and GPT-3.5-turbo are supported."
+            "gpt-4o"
+        ) or config.model.startswith("gpt-3.5-turbo"), "Only GPT-4, GPT-4o, and GPT-3.5-turbo are supported."
 
         self.history: list[dict] = history
         self.prompt = prompt  # user prompt
@@ -441,8 +441,11 @@ class FilmCore:
         See details:
         https://platform.openai.com/docs/models/gpt-4
         """
-
-        if self.config.model.startswith("gpt-4-1106-preview"):
+        if self.config.model.startswith("gpt-4o"):
+            return 128000
+        if self.config.model.startswith("gpt-4o-mini"):
+            return 128000
+        elif self.config.model.startswith("gpt-4-1106-preview"):
             return 128000
         elif self.config.model.startswith("gpt-4-32k"):
             return 32768
@@ -512,6 +515,8 @@ class FilmCore:
             "gpt-4-32k-0314",
             "gpt-4-0613",
             "gpt-4-32k-0613",
+            "gpt-4o",
+            "gpt-4o-mini"
         }:
             tokens_per_message = 3
             tokens_per_name = 1

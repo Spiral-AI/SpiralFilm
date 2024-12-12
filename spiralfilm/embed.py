@@ -25,15 +25,13 @@ class FilmEmbed:
         config=FilmEmbedConfig(),
     ):
         """
+        Embedding wrapper class for OpenAI API.
+        
         Args:
-            config (FilmConfig): A FilmConfig object. Only the following attributes are used:
-                - model
-                - use_cache
+            config (FilmEmbedConfig): Configuration for embedding API.
         """
-
-        assert (
-            config.model == "text-embedding-ada-002"
-        ), "Only text-embedding-ada-002 is supported."
+        supported_models = ["text-embedding-ada-002", "text-embedding-gpt4o"]
+        assert config.model in supported_models, f"Supported models are: {', '.join(supported_models)}"
         self.config = config
 
         self.results = None
@@ -298,12 +296,10 @@ class FilmEmbed:
             return num_tokens
 
     def max_tokens(self):
-        """
-        Returns the maximum number of tokens allowed by the API.
-        See details:
-        https://platform.openai.com/docs/models/gpt-4
-        """
+        """Get max tokens for the configured model."""
         if self.config.model == "text-embedding-ada-002":
             return 8192
+        elif self.config.model == "text-embedding-gpt4o":
+            return 32768
         else:
             raise ValueError(f"Unknown model: {self.config.model}")
