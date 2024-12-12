@@ -37,9 +37,8 @@ class FilmCore:
             config (FilmConfig): A FilmConfig object.
         """
 
-        assert config.model.startswith("gpt-4") or config.model.startswith(
-            "gpt-3.5-turbo"
-        ), "Only GPT-4 and GPT-3.5-turbo are supported."
+        assert config.model.startswith("gpt-4") or config.model.startswith("gpt-4o"), \
+            "Only GPT-4 and GPT-4o are supported."
 
         self.history: list[dict] = history
         self.prompt = prompt  # user prompt
@@ -441,8 +440,11 @@ class FilmCore:
         See details:
         https://platform.openai.com/docs/models/gpt-4
         """
-
-        if self.config.model.startswith("gpt-4-1106-preview"):
+        if self.config.model.startswith("gpt-4o"):
+            return 128000
+        if self.config.model.startswith("gpt-4o-mini"):
+            return 128000
+        elif self.config.model.startswith("gpt-4-1106-preview"):
             return 128000
         elif self.config.model.startswith("gpt-4-32k"):
             return 32768
@@ -505,36 +507,22 @@ class FilmCore:
         except KeyError:
             print("Warning: model not found. Using cl100k_base encoding.")
             encoding = tiktoken.get_encoding("cl100k_base")
-        if model in {
-            "gpt-3.5-turbo-0613",
-            "gpt-3.5-turbo-16k-0613",
-            # "gpt-4-0314",
-            "gpt-4-32k-0314",
-            "gpt-4-0613",
-            "gpt-4-32k-0613",
-        }:
+        
+        if model.startswith("gpt-4o"):
             tokens_per_message = 3
             tokens_per_name = 1
-        elif model == "gpt-3.5-turbo-0301":
-            tokens_per_message = (
-                4  # every message follows <|start|>{role/name}\n{content}<|end|>\n
-            )
-            tokens_per_name = -1  # if there's a name, the role is omitted
-        elif "gpt-3.5-turbo" in model:
-            return self.num_tokens(messages, model="gpt-3.5-turbo-0613")
-        elif "gpt-4" in model:
-            return self.num_tokens(messages, model="gpt-4-0613")
+        elif model.startswith("gpt-4"):
+            tokens_per_message = 3
+            tokens_per_name = 1
         else:
-            raise NotImplementedError(
-                f"""num_tokens_from_messages() is not implemented for model {model}. See https://github.com/openai/openai-python/blob/main/chatml.md for information on how messages are converted to tokens."""
-            )
+            raise ValueError(f"Unknown model: {model}")
+
         num_tokens = 0
         for message in messages:
-
             num_tokens += tokens_per_message
             for key, value in message.items():
                 num_tokens += len(encoding.encode(value))
                 if key == "name":
                     num_tokens += tokens_per_name
-        num_tokens += 3  # every reply is primed with <|start|>assistant<|message|>
+        num_tokens += 3  # every reply is primed with <|start|>
         return num_tokens
