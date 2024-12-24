@@ -11,15 +11,20 @@ import asyncio
 from threading import Lock
 import threading
 import queue
+from notifications import notify_slack
 from .config import FilmConfig
 from .errors import *
-
 import logging
 
 logger = logging.getLogger(__name__)
 
 
 class FilmCore:
+    def check_openai_version():
+        if openai.__version__ < "0.28.0":
+            logger.warning(
+                "OpenAI library version is outdated. Update to >= 0.28.0 for compatibility."
+            )
     def __init__(
         self,
         prompt,
@@ -36,11 +41,10 @@ class FilmCore:
             system_prompt (str): The system prompt to be sent to the API. If None, default prompt is used.
             config (FilmConfig): A FilmConfig object.
         """
-
+        self.check_openai_version()
         assert config.model.startswith("gpt-4") or config.model.startswith(
             "gpt-3.5-turbo"
         ), "Only GPT-4 and GPT-3.5-turbo are supported."
-
         self.history: list[dict] = history
         self.prompt = prompt  # user prompt
         if system_prompt is None:
@@ -72,7 +76,12 @@ class FilmCore:
                     f"cache loading time = {end_time - start_time} sec is too long."
                     + f"Consider deleting cache file ({self.config.cache_path})"
                 )
-
+    def check_token_limit(self, messages):
+        """トークンの制限を超えていないか確認してください。"""
+        tokens = self.num_tokens(messages)
+        if tokens > self.max_tokens():
+            raise ValueError(f"Token limit exceeded: {tokens}/{self.max_tokens()}")
+        
     @staticmethod
     def create_from(
         existing_instance: FilmCore,
@@ -115,6 +124,7 @@ class FilmCore:
         Returns:
             The result of the API call.
         """
+        self.check_token_limit(messages)
         # 必要なデータの準備
         prompt = self._placeholder(self.prompt, placeholders)
         messages = self._messages(prompt, self.history, self.system_prompt)
@@ -241,6 +251,7 @@ class FilmCore:
                 logger.error(f"Error due to content filter: {cfe}")
                 raise
             except Exception as err:
+                notify_slack(f"Error occurred: {err}")
                 logger.error(f"Error: {err}")
                 raise
         else:
@@ -444,6 +455,8 @@ class FilmCore:
 
         if self.config.model.startswith("gpt-4-1106-preview"):
             return 128000
+        elif self.config.model.startswith("gpt-4-32k-2024"):
+            return 32768
         elif self.config.model.startswith("gpt-4-32k"):
             return 32768
         elif self.config.model.startswith("gpt-4"):
@@ -538,3 +551,8 @@ class FilmCore:
                     num_tokens += tokens_per_name
         num_tokens += 3  # every reply is primed with <|start|>assistant<|message|>
         return num_tokens
+    def check_token_limit(self, messages):
+        tokens = self.num_tokens(messages)
+        if tokens > self.max_tokens():
+            raise ValueError(f"Token limit exceeded: {tokens}/{self.max_tokens()}")
+
